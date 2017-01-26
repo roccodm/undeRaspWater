@@ -17,3 +17,5 @@ http://www.adrirobot.it/arduino/voltmetro_amperometro/Arduino_voltmetro-amperome
 
 
 Sulla raspberry vanno dissaldate le resistenza R1 e R2 per garantire il funzionamento del bus I2C quando è spenta. Il pullup è sulla scheda RTC, magari prevedere un pullup da 10K di backup
+
+Per il driver dei led: http://electronics-diy.com/electronic_schematic.php?id=1012
