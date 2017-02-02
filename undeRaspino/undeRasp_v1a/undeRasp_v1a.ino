@@ -196,7 +196,37 @@ void update_waketime(){
  * Increase the global wt (waketime) variable of minutes stored in flash
  */
 void next_waketime(){
-   wt+=EEPROM.read(5)*60;
+   now=RTC.now();
+   wt=now.unixtime();
+   wt+=EEPROM.read(6)*60;
+}
+
+/*
+ * Function start_raspberry
+ * start raspberry and check for heartbeat
+ * MAX_TRY are performed, waiting for TRY_DELAY to check for heartbeat
+ */
+
+int start_raspberry(){
+   if (user_interface("V")>MIN_BATTERY_VOLTAGE){     // if enought battery...
+      Serial.println("Starting raspberry");
+      next_waketime(); // calclulate next waketime
+      rasp_relay(true);
+      //waiting from raspberry heartbeat
+      for (int i=0; i<MAX_TRY; i++){
+         delay(TRY_DELAY);
+         if (!heartbeat) Serial.println("Raspberry non partita");             
+         else break; // Partita
+      }
+      if (heartbeat) {
+         blink_led();
+         heartbeat=false;     // Reset heart
+      } else {           //not heartbit
+               // TODO: gestire errore               
+      }
+   } else { // battey low
+      // TODO: gestire batteria scarica
+   } //end cycle battery low
 }
 
 /*
@@ -207,6 +237,39 @@ double quit_raspberry(){
    halt_request=true;
    return 1;
 }
+
+
+/*
+ * function warning_led()
+ * turns on the status led in yellow color for some second
+ */
+void warning_led() {
+   int i=0;
+   while (i++<1000){
+      digitalWrite(OK_LED_PIN,0);
+      digitalWrite(FAIL_LED_PIN,1);
+      delay(2);
+      digitalWrite(FAIL_LED_PIN,0);
+      digitalWrite(OK_LED_PIN,1);
+      delay(2);                         
+   }
+   digitalWrite(OK_LED_PIN,0);      
+}
+
+/*
+ * function warning_led()
+ * blink status led in green color for some second
+ */
+void blink_led() {
+   digitalWrite(FAIL_LED_PIN,0);
+   for (int i=0;i<5;i++){
+      digitalWrite(OK_LED_PIN,1);  //turn on green led blinking
+      delay(300);
+      digitalWrite(OK_LED_PIN,0);
+      delay(300);
+   }
+}
+
 
 /*
  * Function GetTemp: return internal temperature
@@ -289,6 +352,9 @@ double user_interface (char *cmd_string){
       case 'Q':  // quit raspberry with delay
           retval=quit_raspberry();
           break;
+      case 'L':  // quit raspberry with delay
+          warning_led();
+          break;
       case 't':  // return time
           if (!rasp_running) {
              now=RTC.now();
@@ -296,7 +362,7 @@ double user_interface (char *cmd_string){
              retval=-2;
           }
           break;    
-       case 'T':  // set rtc datetime
+      case 'T':  // set rtc datetime
           if (strlen(cmd_string)<13) return -1;
           for (i=0;i<12;i++) str[i]=cmd_string[i+1];
           str[i]='\0';
@@ -325,9 +391,9 @@ void serialEvent(){
       if (i<BUFFSIZE-1) buffer[i++]=data;
    }
    buffer[i]='\0';
-   Serial.print("CMD: ");
+   Serial.print("CMD ");
    Serial.print(buffer);
-   Serial.print("...:");
+   Serial.print(":");
    retval=user_interface(buffer);
    if (retval==-2) Serial.println(buffer);
    else Serial.println(retval);
@@ -376,23 +442,24 @@ void setup() {
      // Initialize wakeup time register
      update_waketime();
      // Chect wakeuptime, if is before now, set to now
-     if (wt<now.unixtime()) wt=now.unixtime() ;
+     if (wt<now.unixtime()) {         // if the waketime is passed
+        next_waketime();              // and increase of timestep
+        Serial.println(wt); //debug
+        warning_led();                // notify with warning light
+     }
   }
   
   // Bind i2c callbacks
   Wire.onReceive(i2c_receive);
   Wire.onRequest(i2c_send);
 
-
-  // Update the global waketime (wt var)
-  update_waketime();
   // Finally
   if (!error_status) {
-    Serial.println(START_MSG);
-    digitalWrite(FAIL_LED_PIN,0); 
-    digitalWrite(OK_LED_PIN,1);  // Turn on green led
-    delay (2000);
-    digitalWrite(OK_LED_PIN,0);  // Turn off red led
+     Serial.println(START_MSG);
+     digitalWrite(FAIL_LED_PIN,0); 
+     digitalWrite(OK_LED_PIN,1);  // Turn on green led
+     delay (2000);
+     digitalWrite(OK_LED_PIN,0);  // Turn off led
   }
 }
 
@@ -404,33 +471,18 @@ void loop() {
   if(!error_status){
      if(!rasp_running){
         now=RTC.now();
-        Serial.println(wt-now.unixtime());
-        if(now.unixtime()>wt){
-           if (MIN_BATTERY_VOLTAGE>abs(analogRead(VOLTAGE_PIN)*VCC/1024)/R_ALPHA){   
-             Serial.println("Starting raspberry");
-             rasp_relay(true);
-             next_waketime();
-             //waiting from raspberry heartbeat
-             for (int i=0; i<MAX_TRY; i++){
-               delay(TRY_DELAY);
-               if (!heartbeat) Serial.println("Raspberry non partita");             
-               else break;             
-             }
-             if (heartbeat) {
-               Serial.print("Raspberry avviata con successo\n");
-               heartbeat=false;
-             } else {           //not heartbit
-               Serial.println("impossibile avviare raspberry");
-               // TODO: gestire errore               
-             }
-           } else { // battey low
-               // TODO: gestire batteria scarica
-           } //end cycle battery low
+        Serial.println(wt);
+        Serial.println(now.unixtime());
+        int32_t diff=wt-now.unixtime();
+        Serial.println(diff);
+                
+        if(diff<0){
+           start_raspberry();
         } //end cycle raspberry not running
      } else { //raspberry running
         if (halt_request) {
+          warning_led();       
           delay(RASP_SHUTDOWN_TIME);
-          Serial.println("Turning off raspberry");
           rasp_relay(false);
           halt_request=false;
         }
@@ -441,5 +493,7 @@ void loop() {
   delay(5000);
 
 }
+
+
 
 //TODO: watchdog
