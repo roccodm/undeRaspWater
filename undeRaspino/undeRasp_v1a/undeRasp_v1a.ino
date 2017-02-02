@@ -21,6 +21,8 @@
 #define VCC 3.3
 #define RELAY_SET_PIN 9
 #define RELAY_RESET_PIN 8
+#define OK_LED_PIN 7
+#define FAIL_LED_PIN 6
 #define MOSFET_PIN 4
 #define BAUD_RATE 9600
 #define VOLTAGE_PIN A0
@@ -63,6 +65,8 @@ void error_handler(uint8_t errcode, const char * msg){
    Serial.println(msg);
    error_status=true; 
    EEPROM.write(0,errcode);
+   digitalWrite(OK_LED_PIN,0);
+   digitalWrite(FAIL_LED_PIN,1);  // Turn on red led
 }
 
 /*
@@ -354,7 +358,8 @@ void setup() {
   pinMode(RELAY_SET_PIN, OUTPUT);
   pinMode(RELAY_RESET_PIN, OUTPUT);
   pinMode(MOSFET_PIN, OUTPUT);
-
+  pinMode(OK_LED_PIN, OUTPUT);  
+  pinMode(FAIL_LED_PIN, OUTPUT);
   // Inizialize I/O
   Serial.begin(BAUD_RATE); // Start Serial connection
 
@@ -384,6 +389,10 @@ void setup() {
   // Finally
   if (!error_status) {
     Serial.println(START_MSG);
+    digitalWrite(FAIL_LED_PIN,0); 
+    digitalWrite(OK_LED_PIN,1);  // Turn on green led
+    delay (2000);
+    digitalWrite(OK_LED_PIN,0);  // Turn off red led
   }
 }
 
