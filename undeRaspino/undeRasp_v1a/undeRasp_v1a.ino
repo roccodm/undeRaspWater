@@ -1,17 +1,14 @@
-/* UnderRaspino
+/*************************************************************************************** 
+ *  UnderRaspino
+ ***************************************************************************************
  *  v. 1.0a
  *  by Rocco De Marco - rocco.demarco@an.ismar.cnr.it
- *  
- *
- *  
- */
-
+ ***************************************************************************************/
 
 // MESSAGES
 #define START_MSG "UnderRaspino started"
 #define I2C_INIT_FAIL "FATAL: i2c bus error"
 #define RTC_INIT_FAIL "FATAL: RTC error"
-
 
 // ERR CODES
 #define I2C_ERRCODE 1
@@ -133,8 +130,7 @@ double set_eprom_datetime(char *data){
    sprintf(str,"%c%c",data[8],data[9]);
    int minute=atoi(str);
    sprintf(str,"%c%c%c",data[10],data[11],data[12]);
-   int timestep=atoi(str);
-   
+   int timestep=atoi(str);   
    if (year<17 || month<=0 || month>12 || day<=0 || day >31 || hour>=24 || minute>=60 || 
        timestep <=0 || timestep >250) return -1;  // Problem in conversion
    EEPROM.write(1,year);
@@ -242,6 +238,7 @@ double quit_raspberry(){
 /*
  * function warning_led()
  * turns on the status led in yellow color for some second
+ * a two pin red/green led in connected on OK_LED_PIN and FAIL_LED_PIN
  */
 void warning_led() {
    int i=0;
@@ -261,12 +258,12 @@ void warning_led() {
  * blink status led in green color for some second
  */
 void blink_led() {
-   digitalWrite(FAIL_LED_PIN,0);
+   digitalWrite(FAIL_LED_PIN,0);   // just to be sure...
    for (int i=0;i<5;i++){
-      digitalWrite(OK_LED_PIN,1);  //turn on green led blinking
-      delay(300);
+      digitalWrite(OK_LED_PIN,1);  // turn on green led blinking
+      delay(200);
       digitalWrite(OK_LED_PIN,0);
-      delay(300);
+      delay(200);
    }
 }
 
@@ -312,57 +309,58 @@ double user_interface (char *cmd_string){
    char cmd=cmd_string[0];   
    double retval=-1;
    switch (cmd){
-      case 'S':   // Start raspberry         
+      case 'S':   // Start raspberry ////////////////////////////////////////////////////////////////////////////////////////        
           retval=rasp_relay(true);
           break;
-      case 's':   // Stop raspberry immediately
+      case 's':   // Stop raspberry immediately//////////////////////////////////////////////////////////////////////////////
           retval=rasp_relay(false);
           break;
-      case 'V':  // Voltage read
+      case 'V':  // Voltage read ////////////////////////////////////////////////////////////////////////////////////////////
           retval=abs(analogRead(VOLTAGE_PIN)*VCC/1024)/R_ALPHA;
           break;
-      case 'A':  // Ampere read
+      case 'A':  // Ampere read /////////////////////////////////////////////////////////////////////////////////////////////
           retval=abs((analogRead(AMPERE_PIN)*VCC/1024)-2.5)/0.185;
           break;
-      case 'C':  // internalTemperature read
+      case 'C':  // internalTemperature read ////////////////////////////////////////////////////////////////////////////////
           retval=GetTemp();
           break;
-      case 'd':  // read Eprom Date
+      case 'd':  // read Eprom Date /////////////////////////////////////////////////////////////////////////////////////////
           retval=read_eprom_datetime();
           break;
-      case 'D':  // set Eprom Date
+      case 'D':  // set Eprom Date //////////////////////////////////////////////////////////////////////////////////////////
           if (strlen(cmd_string)<14) return -1;
           for (i=0;i<13;i++) str[i]=cmd_string[i+1];
           str[i]='\0';
           retval=set_eprom_datetime(str);
           break;
-      case 'e':  // read last error in EPROM
-          retval=EEPROM.read(0);
-      case 'H':  // set earthbit
-          heartbeat=true;
-          retval=1;    
-          break;
-      case 'h':  // read heartbeat
-          retval=heartbeat;    
-          break;     
-      case 'E':  // clear last error in EPROM
+      case 'E':  // clear last error in EPROM ///////////////////////////////////////////////////////////////////////////////
           EEPROM.write(0,0);
           retval=1;
           break;
-      case 'Q':  // quit raspberry with delay
+      case 'e':  // read last error in EPROM ////////////////////////////////////////////////////////////////////////////////
+          retval=EEPROM.read(0);
+      case 'H':  // set earthbit ////////////////////////////////////////////////////////////////////////////////////////////
+          heartbeat=true;
+          retval=1;    
+          break;
+      case 'h':  // read heartbeat //////////////////////////////////////////////////////////////////////////////////////////
+          retval=heartbeat;    
+          break;     
+      case 'Q':  // quit raspberry with delay ///////////////////////////////////////////////////////////////////////////////
           retval=quit_raspberry();
           break;
-      case 'L':  // quit raspberry with delay
-          warning_led();
+      case 'L':  // Test led ////////////////////////////////////////////////////////////////////////////////////////////////
+          blink_led();
           break;
-      case 't':  // return time
+      case 't':  // return time /////////////////////////////////////////////////////////////////////////////////////////////
           if (!rasp_running) {
              now=RTC.now();
-             sprintf(buffer,"%02d/%02d/%04d %02d:%02d:%02d",now.day(),now.month(),now.year(),now.hour(),now.minute(),now.second());
-             retval=-2;
+             sprintf(buffer,"%02d/%02d/%04d %02d:%02d:%02d",now.day(),now.month(),
+                            now.year(),now.hour(),now.minute(),now.second());
+             retval=-2;  // means print buffer
           }
           break;    
-      case 'T':  // set rtc datetime
+      case 'T':  // set rtc datetime ////////////////////////////////////////////////////////////////////////////////////////
           if (strlen(cmd_string)<13) return -1;
           for (i=0;i<12;i++) str[i]=cmd_string[i+1];
           str[i]='\0';
