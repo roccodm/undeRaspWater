@@ -16,6 +16,8 @@
 
 // CONFIG
 #define VCC 3.3
+#define SERIAL_ARDUINO_PIN 12
+#define SERIAL_RASPBERRY_PIN 13
 #define RELAY_SET_PIN 9
 #define RELAY_RESET_PIN 8
 #define OK_LED_PIN 7
@@ -419,12 +421,16 @@ void i2c_send(){
 
 void setup() {
   // Set ports
+  pinMode(SERIAL_ARDUINO_PIN, OUTPUT);
+  pinMode(SERIAL_RASPBERRY_PIN, OUTPUT);
   pinMode(RELAY_SET_PIN, OUTPUT);
   pinMode(RELAY_RESET_PIN, OUTPUT);
   pinMode(MOSFET_PIN, OUTPUT);
   pinMode(OK_LED_PIN, OUTPUT);  
   pinMode(FAIL_LED_PIN, OUTPUT);
   // Inizialize I/O
+  digitalWrite(SERIAL_RASPBERRY_PIN,0);
+  digitalWrite(SERIAL_ARDUINO_PIN,1);
   Serial.begin(BAUD_RATE); // Start Serial connection
 
   // Inizialize I2C
