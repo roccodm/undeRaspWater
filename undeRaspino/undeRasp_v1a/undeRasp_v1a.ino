@@ -77,6 +77,27 @@ void error_handler(uint8_t errcode, const char * msg){
 }
 
 /*
+ * Function read_voltage()
+ * reads 5 times voltage and return the median value
+ */
+
+double read_voltage(){
+   double v[5];
+   double temp;
+   for (int i=0;i<5;i++) v[i]=(analogRead(VOLTAGE_PIN)*VCC/1024)/R_ALPHA;
+   // sorting values
+   for (int i=0;i<4;i++)
+      for (int j=1;j<5;j++)
+         if (v[j]>v[i]){
+            temp=v[i];
+            v[i]=v[j];
+            v[j]=temp;
+         }
+    return v[2]; // return the median value
+}
+
+
+/*
  * function rasp_relay (set)
  * turn on/off raspberry
  * sets the global var "rasp_running"
@@ -150,7 +171,8 @@ double set_eprom_datetime(char *data){
    EEPROM.write(5,minute);
    EEPROM.write(6,timestep);  
    update_waketime(); 
-   return 1;
+   sprintf(buffer,"ok");
+   return -2;
 }
 
 /*
@@ -254,7 +276,7 @@ int start_raspberry(){
 double quit_raspberry(){
    halt_request=true;
    warning_led();
-   return 5;
+   return 1;
 }
 
 
@@ -403,7 +425,7 @@ double user_interface (char *cmd_string){
           }
           break;    
       case 'V':  // Voltage read ////////////////////////////////////////////////////////////////////////////////////////////
-          retval=abs(analogRead(VOLTAGE_PIN)*VCC/1024)/R_ALPHA;
+          retval=read_voltage();
           break;
       case '?':  // print menu //////////////////////////////////////////////////////////////////////////////////////////////
           Serial.print(MENU1);
