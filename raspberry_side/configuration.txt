@@ -1,0 +1,46 @@
+RASPBERRY CONFIGURATION
+=======================
+
+1) RTC
+
+1.1) Edit /etc/modules
+Add following lines:
+-------------------------------
+i2c-dev
+rtc-ds1307
+-------------------------------
+
+1.2) Edit /etc/rc.local
+Add following lines:
+-------------------------------
+echo ds1307 0x68 > /sys/class/i2c-adapter/i2c-1/new_device
+hwclock --hctosys
+-------------------------------
+before "exit 0"
+
+
+2) Arduino interaction
+
+2.1) Compile/Copy ardui2c in /bin/
+2.2) Edit /etc/rc.local
+Add following lines:
+-------------------------------
+/bin/ardui2c H
+-------------------------------
+before "exit 0"
+
+2.3) execute as root...
+-------------------------------
+cat >/etc/rc6.d/K01arduiQuit <<EOF
+#!/bin/bash
+
+/bin/ardui2c Q
+EOF
+chmod 755 /etc/rc6.d/K01arduiQuit
+-------------------------------
+
+
+
+
+
+

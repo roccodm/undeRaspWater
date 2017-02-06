@@ -37,24 +37,26 @@
 #define I2C_ADDRESS 0x04
 #define I2C_SDA A4
 #define I2C_SCL A5
-#define RTC_MIN_DATE 1483228800 //1/1/2017 0:0:0
+#define RTC_MIN_DATE 1483228800   //1/1/2017 0:0:0
 #define BUFFSIZE 21
-#define R_ALPHA 0.152 // for V read purpose 
-#define RASP_SHUTDOWN_TIME 30000
-#define MAX_TRY 5        // max raspberry starting tentatives
-#define TRY_DELAY 30000     // delay ( between tests
-#define MIN_BATTERY_VOLTAGE 10  // minimum voltage to start raspberry in safe
+#define R_ALPHA 0.152             // for V read purpose, R partitor coeff.
+#define RASP_SHUTDOWN_TIME 30     // delay for shutdown in seconds
+#define MAX_TRY 5                 // max raspberry starting tentatives
+#define TRY_DELAY 30              // delay (between tests) in seconds
+#define MIN_BATTERY_VOLTAGE 10    // minimum voltage to start raspberry in safe
+#define MIN_RASPBERRY_DELAY 10    // in minutes
 
 // INCLUDES
 #include <Wire.h>
 #include "RTClib.h"
 #include <EEPROM.h>
+#include <avr/wdt.h>
 
 // GLOBAL VARS
 RTC_DS1307 RTC;
 DateTime now;
 char buffer[BUFFSIZE];    // general purpose global buffer
-bool error_status=false;  // 
+bool error_status=false;  // flag setted up in case of fatal errors
 bool rasp_running=false;  // raspberry running status flag
 bool halt_request=false;  // raspberry asks for halt
 bool heartbeat=false;     // Setted from raspberry via i2c
@@ -163,8 +165,7 @@ double read_eprom_datetime(){
  */
 
 
-double set_eprom_datetime(char data[]){
-   if (strlen(data)!=13) return -1.3;    // Malformed query string
+double set_eprom_datetime(char *data){
    int year=*data * 10 + *(data+1);
    int month=*(data+2) * 10 + *(data+3);
    int day=*(data+4) * 10 + *(data+5);
@@ -191,22 +192,12 @@ double set_eprom_datetime(char data[]){
  */
 
 double set_rtc_datetime(char *data){
-   if (strlen(data)!=12) return -1;    // Malformed query string
-   char str[4];
-   sprintf(str,"%c%c",data[0],data[1]);
-   int year=atoi(str);
-   sprintf(str,"%c%c",data[2],data[3]);
-   int month=atoi(str);
-   sprintf(str,"%c%c",data[4],data[5]);
-   int day=atoi(str);
-   sprintf(str,"%c%c",data[6],data[7]);
-   int hour=atoi(str);
-   sprintf(str,"%c%c",data[8],data[9]);
-   int minute=atoi(str);
-   sprintf(str,"%c%c",data[10],data[11]);
-   int second=atoi(str);
-   sprintf(buffer,"%02d/%02d/%02d %02d:%02d:%02d",day,month,year,hour,minute,second); //debug
-   Serial.println(buffer); //debug
+   int year=*data * 10 + *(data+1);
+   int month=*(data+2) * 10 + *(data+3);
+   int day=*(data+4) * 10 + *(data+5);
+   int hour=*(data+6) * 10 + *(data+7);
+   int minute=*(data+8) * 10 + *(data+9);
+   int second=*(data+10) * 10 + *(data+11);
    RTC.adjust(DateTime(year+2000,month,day,hour,minute,second));
    return 1;
 }
@@ -260,19 +251,20 @@ int start_raspberry(){
       }
       //waiting from raspberry heartbeat
       for (int i=0; i<MAX_TRY; i++){
-         delay(TRY_DELAY);
-         if (!heartbeat){
+         for (int j=0;j<=TRY_DELAY;j++){
+            delay(1000);
+            wdt_reset();
+            if (heartbeat) {
+               Serial.write("Ricevuto heartbeat"); // debug
+               blink_led();
+               heartbeat=false;     // Reset heartbeat
+               break;
+            }
+         }
+      }      
+      if (!heartbeat){
             Serial.println("Raspberry non partita"); //Debug            
-         } 
-         else break; // Partita
-      }
-      if (heartbeat) {
-         Serial.write("Ricevuto heartbeat"); // debug
-         blink_led();
-         heartbeat=false;     // Reset heart
-      } else {           //not heartbit
-               // TODO: gestire errore               
-      }
+      } 
    } else {
       error_handler(LOWBAT_ERRCODE,LOWBAT);
    } //end cycle battery low
@@ -364,7 +356,7 @@ double user_interface (char *cmd_string){
    double retval=-1;
    switch (cmd){
       case 'A':  // Ampere read /////////////////////////////////////////////////////////////////////////////////////////////
-          retval=((get_pin_median(AMPERE_PIN,100)*VCC/1024)-2.5)/0.185;
+          retval=((get_pin_median(AMPERE_PIN,50)*VCC/1024)-2.5)/0.185;
           break;
       case 'C':  // internalTemperature read ////////////////////////////////////////////////////////////////////////////////
           retval=GetTemp();
@@ -373,12 +365,11 @@ double user_interface (char *cmd_string){
           retval=read_eprom_datetime();
           break;
       case 'D':  // set Eprom Date //////////////////////////////////////////////////////////////////////////////////////////
-          //if (strlen(cmd_string)!=14) return -1.1;                        // fixed size: 14 char
+          if (strlen(cmd_string)!=14) return -1.1;                        // fixed size: 14 char
           for (i=0;i<13;i++){ 
               if (cmd_string[i+1]<48 or cmd_string[i+1]>57) str[i]=0;  // only number accepted
               else str[i]=cmd_string[i+1]-48;                          // pretty simple atoi
           }
-          str[i]='\0';
           retval=set_eprom_datetime(str);
           break;
       case 'E':  // clear last error in EPROM ///////////////////////////////////////////////////////////////////////////////
@@ -423,9 +414,11 @@ double user_interface (char *cmd_string){
           retval=rasp_relay(false);
           break;
       case 'T':  // set rtc datetime ////////////////////////////////////////////////////////////////////////////////////////
-          if (strlen(cmd_string)<13) return -1;
-          for (i=0;i<12;i++) str[i]=cmd_string[i+1];
-          str[i]='\0';
+          if (strlen(cmd_string)!=13) return -1.1;                        // fixed size: 14 char
+          for (i=0;i<12;i++){ 
+              if (cmd_string[i+1]<48 or cmd_string[i+1]>57) str[i]=0;  // only number accepted
+              else str[i]=cmd_string[i+1]-48;                          // pretty simple atoi
+          }
           retval=set_rtc_datetime(str);       
           break;         
       case 't':  // return time /////////////////////////////////////////////////////////////////////////////////////////////
@@ -437,7 +430,10 @@ double user_interface (char *cmd_string){
           }
           break;    
       case 'V':  // Voltage read ////////////////////////////////////////////////////////////////////////////////////////////
-          retval=(get_pin_median(VOLTAGE_PIN,50)*VCC/1024)/R_ALPHA;
+          retval=(get_pin_median(VOLTAGE_PIN,20)*VCC/1024)/R_ALPHA;
+          break;
+      case 'W':  // Watts in use ////////////////////////////////////////////////////////////////////////////////////////////
+          retval=user_interface("V")*user_interface("A");
           break;
       case '?':  // print menu //////////////////////////////////////////////////////////////////////////////////////////////
           Serial.print(MENU1);
@@ -535,6 +531,9 @@ void setup() {
   Wire.onReceive(i2c_receive);
   Wire.onRequest(i2c_send);
 
+  // Enable watchdog (8 secs)
+  wdt_enable(WDTO_8S);
+  
   // Finally
   if (!error_status) {
      Serial.println(START_MSG);
@@ -553,20 +552,22 @@ void loop() {
   if(!error_status){
      if(!rasp_running){
         now=RTC.now();
-        Serial.println(wt);
-        Serial.println(now.unixtime());
-        int32_t diff=wt-now.unixtime();
-        Serial.println(diff);
-                
-        if(diff<0){
+        if(wt<now.unixtime()){
            start_raspberry();
         } //end cycle raspberry not running
      } else { //raspberry running
-        Serial.println(heartbeat);
+        // Serial.println(heartbeat); TODO: gestione heartbeat
         heartbeat=false;
         if (halt_request) {
-          warning_led();     //debug  
+          // for long delay is needed to split in part to avoid watchdog reset
+          for (int i=0;i<=RASP_SHUTDOWN_TIME;i++){
+             delay(1000);
+             wdt_reset();
+          }
           delay(RASP_SHUTDOWN_TIME);
+          // first all, avoiding fast restart adding MIN_RASPBERRY_DELAY
+          now=RTC.now();
+          if (wt<now.unixtime()) wt=now.unixtime()+MIN_RASPBERRY_DELAY*60;   
           rasp_relay(false);
           halt_request=false;
         }
@@ -574,8 +575,8 @@ void loop() {
   } else { // error status setted
     
   }
-  delay(5000);
-
+  delay(3000);
+  wdt_reset();
 }
 
 
