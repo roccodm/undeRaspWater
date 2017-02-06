@@ -11,9 +11,9 @@
 #define RTC_INIT_FAIL "FATAL: RTC error"
 #define LOWBAT "Low battery to start Raspberry"
 #define RASP_FAIL "Unable to powerup Raspberry"
-#define MENU1 "\nA\tpower used(A)\nC\tArduino temperature\nd/D\tread/write EEPROM datestam (YYMMDDHHMMXXX)\nE/e\tclear/read last error in eprom"
-#define MENU2 "\nH/h\tset/read heartbeat\nK/k\tenable/disable raspberry serial out\nL\tBlink led\nP/p\tenable/disable arduino serial out\nQ\tQuit raspberry"
-#define MENU3 "\nS/s\tstart/stop raspberry relay\nT/t\tSet/read RTC (YYMMDDHHMMSS)\nV\tread voltage\n?\tPrint his menu"
+#define MENU1 "\nA\tpower used(A)\nC\tARD temperature\nd/D\tread/write EEPROM datestam (YYMMDDHHMMXXX)\nE/e\tclear/read last error in eprom"
+#define MENU2 "\nH/h\tset/read heartbeat\nK/k\tenable/disable RB serial out\nL\tBlink led\nM\tmissing time to start RB\nP/p\tenable/disable ARD serial out\nQ\tQuit RB"
+#define MENU3 "\nS/s\tstart/stop RB relay\nT/t\tSet/read RTC (YYMMDDHHMMSS)\nV\tread voltage\nW\tread watt\n?\tPrint his menu"
 
 // ERR CODES
 #define I2C_ERRCODE 0x81
@@ -251,20 +251,20 @@ int start_raspberry(){
       }
       //waiting from raspberry heartbeat
       for (int i=0; i<MAX_TRY; i++){
-         for (int j=0;j<=TRY_DELAY;j++){
+         for (int j=0;j<TRY_DELAY;j++){
             delay(1000);
             wdt_reset();
             if (heartbeat) {
                Serial.write("Ricevuto heartbeat"); // debug
                blink_led();
-               heartbeat=false;     // Reset heartbeat
-               break;
+               i=MAX_TRY;  // exiting loop
             }
          }
       }      
       if (!heartbeat){
             Serial.println("Raspberry non partita"); //Debug            
       } 
+      heartbeat=false;     // Reset heartbeat
    } else {
       error_handler(LOWBAT_ERRCODE,LOWBAT);
    } //end cycle battery low
@@ -356,7 +356,7 @@ double user_interface (char *cmd_string){
    double retval=-1;
    switch (cmd){
       case 'A':  // Ampere read /////////////////////////////////////////////////////////////////////////////////////////////
-          retval=((get_pin_median(AMPERE_PIN,50)*VCC/1024)-2.5)/0.185;
+          retval=((get_pin_median(AMPERE_PIN)*VCC/1024)-2.5)/0.185;
           break;
       case 'C':  // internalTemperature read ////////////////////////////////////////////////////////////////////////////////
           retval=GetTemp();
@@ -388,12 +388,21 @@ double user_interface (char *cmd_string){
       case 'K':  // enable raspberry serial output (and disable arduino output) /////////////////////////////////////////////
           digitalWrite(SERIAL_ARDUINO_PIN,0);       
           digitalWrite(SERIAL_RASPBERRY_PIN,1);
+          retval=1;
           break;     
       case 'k':  // disable raspberry serial output /////////////////////////////////////////////////////////////////////////
           digitalWrite(SERIAL_RASPBERRY_PIN,0);       
+          retval=1;
           break;     
       case 'L':  // Test led ////////////////////////////////////////////////////////////////////////////////////////////////
-          blink_led();
+          if (!rasp_running) blink_led();
+          retval=1;
+          break;
+      case 'M':  // Missing seconds to start raspberry //////////////////////////////////////////////////////////////////////
+          if (!rasp_running) {
+             now=RTC.now(); 
+             retval=wt-now.unixtime();
+          }
           break;
       case 'P':  // enable arduino serial output (and disable raspberry output) /////////////////////////////////////////////
           digitalWrite(SERIAL_ARDUINO_PIN,1);       
@@ -414,12 +423,14 @@ double user_interface (char *cmd_string){
           retval=rasp_relay(false);
           break;
       case 'T':  // set rtc datetime ////////////////////////////////////////////////////////////////////////////////////////
-          if (strlen(cmd_string)!=13) return -1.1;                        // fixed size: 14 char
-          for (i=0;i<12;i++){ 
-              if (cmd_string[i+1]<48 or cmd_string[i+1]>57) str[i]=0;  // only number accepted
-              else str[i]=cmd_string[i+1]-48;                          // pretty simple atoi
+          if (!rasp_running) {
+             if (strlen(cmd_string)!=13) return -1.1;                        // fixed size: 13 char
+             for (i=0;i<12;i++){ 
+                 if (cmd_string[i+1]<48 or cmd_string[i+1]>57) str[i]=0;  // only number accepted
+                 else str[i]=cmd_string[i+1]-48;                          // pretty simple atoi
+             }
+             retval=set_rtc_datetime(str);       
           }
-          retval=set_rtc_datetime(str);       
           break;         
       case 't':  // return time /////////////////////////////////////////////////////////////////////////////////////////////
           if (!rasp_running) {
@@ -430,7 +441,7 @@ double user_interface (char *cmd_string){
           }
           break;    
       case 'V':  // Voltage read ////////////////////////////////////////////////////////////////////////////////////////////
-          retval=(get_pin_median(VOLTAGE_PIN,20)*VCC/1024)/R_ALPHA;
+          retval=(get_pin_median(VOLTAGE_PIN)*VCC/1024)/R_ALPHA;
           break;
       case 'W':  // Watts in use ////////////////////////////////////////////////////////////////////////////////////////////
           retval=user_interface("V")*user_interface("A");
