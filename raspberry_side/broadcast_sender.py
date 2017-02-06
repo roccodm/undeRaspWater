@@ -1,3 +1,4 @@
+
 # Send UDP broadcast packets
 MYPORT = 50000
 
@@ -7,7 +8,7 @@ import os
 
 
 
-# Return CPU temperature as a character string                                      
+# Return CPU temperature as a character string
 def getCPUtemperature():
     res = os.popen('vcgencmd measure_temp').readline()
     return(res.replace("temp=","").replace("'C\n",""))
@@ -34,7 +35,13 @@ def getDiskSpace():
 
 
 def getRTCdate():
-    return os.popen('sudo hwclock -r').readline()
+    return os.popen('sudo hwclock -r').readline().replace("\n","")
+
+def getBATTERY():
+    return os.popen('/bin/ardui2c V|cut -b-6').readline().replace("\n","")
+
+def getARDtemp():
+    return os.popen('/bin/ardui2c C|cut -b-6').readline().replace("\n","")
 
 
 
@@ -42,11 +49,14 @@ s = socket(AF_INET, SOCK_DGRAM)
 s.bind(('', 0))
 s.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
 while 1:
-    #data = time.asctime( time.localtime(time.time()) ) + '\n'
-    data="*****************************\nCPU TEMP:\t"+getCPUtemperature()
-    data+="\nCPU USAGE:\t"+getCPUuse()
-    data+="\nRTC DATE:\t"+getRTCdate()
-    data+="\nDISK free:\t"+str(getDiskSpace()[1])
-    data+="\n"
+    data="CPU_TMP:"+getCPUtemperature()
+    data+="\nARD_TMP:"+getARDtemp()
+    data+="\nCPU_USG:"+getCPUuse()
+    data+="\nDSK_FRE:"+str(getDiskSpace()[1])
+    data+="\nBAT_VLT:"+getBATTERY()
+    data+="\nRTC_DTE:"+getRTCdate()
+    data+="\n\n"
     s.sendto(data, ('<broadcast>', MYPORT))
-    time.sleep(3)
+    time.sleep(5)
+
+
