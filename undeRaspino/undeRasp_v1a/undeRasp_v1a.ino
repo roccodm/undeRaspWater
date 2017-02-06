@@ -16,10 +16,10 @@
 #define MENU3 "\nS/s\tstart/stop raspberry relay\nT/t\tSet/read RTC (YYMMDDHHMMSS)\nV\tread voltage\n?\tPrint his menu"
 
 // ERR CODES
-#define I2C_ERRCODE 1
-#define RTC_ERRCODE 2
-#define LOWBAT_ERRCODE 3
-#define RASP_FAIL_ERRCODE 4
+#define I2C_ERRCODE 0x81
+#define RTC_ERRCODE 0x82
+#define LOWBAT_ERRCODE 0x83
+#define RASP_FAIL_ERRCODE 0x84
 
 // CONFIG
 #define VCC 3.3
@@ -77,23 +77,34 @@ void error_handler(uint8_t errcode, const char * msg){
 }
 
 /*
- * Function read_voltage()
- * reads 5 times voltage and return the median value
+ * Function get_pin_median(pinNumber, readDelay)
+ * 
+ * Sometimes the adc could read dirty values. To avoid wrong values in critical operations
+ * more values are read and stored in an ordered array of odd number of elements. 
+ * Sorting the array, the bad value will go in a boundary and, returning the median value
+ * (the central element in the array), it's highly probable to get a good value.
+ * 
+ * The InsertionSort algorithm has been used to sort the values, that is pretty fast (such 
+ * as the quicksort algorithm!!!) for small array (under 10 element, optimus is 7).
+ * 
+ * Input:
+ *   PinNumber: analog pin to be read
+ *   Delay: optional delay between read
+ * Output:
+ *   The median value of the array of seven reads (integer)
  */
 
-double read_voltage(){
-   double v[5];
-   double temp;
-   for (int i=0;i<5;i++) v[i]=(analogRead(VOLTAGE_PIN)*VCC/1024)/R_ALPHA;
-   // sorting values
-   for (int i=0;i<4;i++)
-      for (int j=1;j<5;j++)
-         if (v[j]>v[i]){
-            temp=v[i];
-            v[i]=v[j];
-            v[j]=temp;
-         }
-    return v[2]; // return the median value
+int get_pin_median (int pinNumber, int readDelay=0){
+   int value,v[7];         
+   for(int n=0;n<7;n++){                            
+      int i=0;
+      value=analogRead(pinNumber);
+      while (i<n and value<=v[i]) i++;
+      for (int j=n-1;j>=i;j--) v[j+1]=v[j];
+      v[i]=value;
+      delay(readDelay);
+  }
+  return v[3];
 }
 
 
@@ -145,25 +156,23 @@ double read_eprom_datetime(){
 }
 
 
+/*
+ * Function set_eprom_datetime(string)
+ * sets the startup datetime  to given value
+ * string format: YYMMDDHHMMXXX where XXX is timestep (max 250)
+ */
 
 
-double set_eprom_datetime(char *data){
-   if (strlen(data)!=13) return -1.2;    // Malformed query string
-   char str[4];
-   sprintf(str,"%c%c",data[0],data[1]);
-   int year=atoi(str);
-   sprintf(str,"%c%c",data[2],data[3]);
-   int month=atoi(str);
-   sprintf(str,"%c%c",data[4],data[5]);
-   int day=atoi(str);
-   sprintf(str,"%c%c",data[6],data[7]);
-   int hour=atoi(str);
-   sprintf(str,"%c%c",data[8],data[9]);
-   int minute=atoi(str);
-   sprintf(str,"%c%c%c",data[10],data[11],data[12]);
-   int timestep=atoi(str);   
+double set_eprom_datetime(char data[]){
+   if (strlen(data)!=13) return -1.3;    // Malformed query string
+   int year=*data * 10 + *(data+1);
+   int month=*(data+2) * 10 + *(data+3);
+   int day=*(data+4) * 10 + *(data+5);
+   int hour=*(data+6) * 10 + *(data+7);
+   int minute=*(data+8) * 10 + *(data+9);
+   int timestep=*(data+10) * 100 + *(data+11) * 10 + *(data+12);
    if (year<17 || month<=0 || month>12 || day<=0 || day >31 || hour>=24 || minute>=60 || 
-       timestep <=0 || timestep >250) return -1;  // Problem in conversion
+       timestep <=0 || timestep >250) return -1.4;  // Problem in conversion
    EEPROM.write(1,year);
    EEPROM.write(2,month);
    EEPROM.write(3,day);   
@@ -355,7 +364,7 @@ double user_interface (char *cmd_string){
    double retval=-1;
    switch (cmd){
       case 'A':  // Ampere read /////////////////////////////////////////////////////////////////////////////////////////////
-          retval=abs((analogRead(AMPERE_PIN)*VCC/1024)-2.5)/0.185;
+          retval=((get_pin_median(AMPERE_PIN,100)*VCC/1024)-2.5)/0.185;
           break;
       case 'C':  // internalTemperature read ////////////////////////////////////////////////////////////////////////////////
           retval=GetTemp();
@@ -364,8 +373,11 @@ double user_interface (char *cmd_string){
           retval=read_eprom_datetime();
           break;
       case 'D':  // set Eprom Date //////////////////////////////////////////////////////////////////////////////////////////
-          if (strlen(cmd_string)!=14) return -1.1;
-          for (i=0;i<13;i++) str[i]=cmd_string[i+1];
+          //if (strlen(cmd_string)!=14) return -1.1;                        // fixed size: 14 char
+          for (i=0;i<13;i++){ 
+              if (cmd_string[i+1]<48 or cmd_string[i+1]>57) str[i]=0;  // only number accepted
+              else str[i]=cmd_string[i+1]-48;                          // pretty simple atoi
+          }
           str[i]='\0';
           retval=set_eprom_datetime(str);
           break;
@@ -425,7 +437,7 @@ double user_interface (char *cmd_string){
           }
           break;    
       case 'V':  // Voltage read ////////////////////////////////////////////////////////////////////////////////////////////
-          retval=read_voltage();
+          retval=(get_pin_median(VOLTAGE_PIN,50)*VCC/1024)/R_ALPHA;
           break;
       case '?':  // print menu //////////////////////////////////////////////////////////////////////////////////////////////
           Serial.print(MENU1);
