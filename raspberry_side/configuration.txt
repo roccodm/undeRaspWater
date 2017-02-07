@@ -25,12 +25,26 @@ before "exit 0"
 2.2) Edit /etc/rc.local
 Add following lines:
 -------------------------------
-/bin/ardui2c H
+nohup /bin/pinger &
+nohup python /bin/broadcast_sender.py &
 -------------------------------
 before "exit 0"
 
 2.3) execute as root...
 -------------------------------
+cat >/bin/pinger <<EOF
+#!/bin/sh
+
+while test 1
+do
+   /bin/ardui2c H
+   sleep 3s
+done
+EOF
+
+chmod 755 /bin/pinger
+
+
 cat >/etc/rc6.d/K01arduiQuit <<EOF
 #!/bin/bash
 

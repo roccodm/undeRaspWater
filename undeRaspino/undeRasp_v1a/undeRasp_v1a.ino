@@ -12,7 +12,7 @@
 #define LOWBAT "Low battery to start Raspberry"
 #define RASP_FAIL "Unable to powerup Raspberry"
 #define MENU1 "\nA\tpower used(A)\nC\tARD temperature\nd/D\tread/write EEPROM datestam (YYMMDDHHMMXXX)\nE/e\tclear/read last error in eprom"
-#define MENU2 "\nH/h\tset/read heartbeat\nK/k\tenable/disable RB serial out\nL\tBlink led\nM\tmissing time to start RB\nP/p\tenable/disable ARD serial out\nQ\tQuit RB"
+#define MENU2 "\nH/h\tset/read heartbeat\nK/k\tenable/disable RB serial out\nL/l\tTurn on/off mosfet\nM\tmissing time to start RB\nP/p\tenable/disable ARD serial out\nQ\tQuit RB"
 #define MENU3 "\nS/s\tstart/stop RB relay\nT/t\tSet/read RTC (YYMMDDHHMMSS)\nV\tread voltage\nW\tread watt\n?\tPrint his menu"
 
 // ERR CODES
@@ -43,7 +43,7 @@
 #define RASP_SHUTDOWN_TIME 30     // delay for shutdown in seconds
 #define MAX_TRY 5                 // max raspberry starting tentatives
 #define TRY_DELAY 30              // delay (between tests) in seconds
-#define MIN_BATTERY_VOLTAGE 10    // minimum voltage to start raspberry in safe
+#define MIN_BATTERY_VOLTAGE 9     // minimum voltage to start raspberry in safe
 #define MIN_RASPBERRY_DELAY 10    // in minutes
 
 // INCLUDES
@@ -70,10 +70,10 @@ uint32_t wt=0;            // waketime unix stamp
  * 3) sets to true global variable error_status
  * 4) turns on a red led [TODO]
  */
-void error_handler(uint8_t errcode, const char * msg){
+void error_handler(byte errcode, const char * msg){
    Serial.println(msg);
    error_status=true; 
-   EEPROM.write(0,errcode);
+   EEPROM.write(7,errcode);
    digitalWrite(OK_LED_PIN,0);
    digitalWrite(FAIL_LED_PIN,1);  // Turn on red led
 }
@@ -130,19 +130,20 @@ double rasp_relay(bool set){
        rasp_running=false;
        return 0;
    }
+   
 }
 /*
  * EPROM data structure
  * ----------------------------------------
  * byte | value
  * ----------------------------------------
- *   0  | Last error code
  *   1  | Year, last two digits  
  *   2  | Month
  *   3  | Day
  *   4  | Hour
  *   5  | Minute
  *   6  | Timestep for delay (minutes)
+ *   7  | Last error code
  * ----------------------------------------
  */
 
@@ -276,7 +277,6 @@ int start_raspberry(){
  */
 double quit_raspberry(){
    halt_request=true;
-   warning_led();
    return 1;
 }
 
@@ -377,7 +377,7 @@ double user_interface (char *cmd_string){
           retval=1;
           break;
       case 'e':  // read last error in EPROM ////////////////////////////////////////////////////////////////////////////////
-          retval=EEPROM.read(0);
+          retval=EEPROM.read(7);
       case 'H':  // set earthbit ////////////////////////////////////////////////////////////////////////////////////////////
           heartbeat=true;
           retval=1;    
@@ -394,10 +394,14 @@ double user_interface (char *cmd_string){
           digitalWrite(SERIAL_RASPBERRY_PIN,0);       
           retval=1;
           break;     
-      case 'L':  // Test led ////////////////////////////////////////////////////////////////////////////////////////////////
-          if (!rasp_running) blink_led();
-          retval=1;
+      case 'l':  // Turn off mosfet /////////////////////////////////////////////////////////////////////////////////////////
+          digitalWrite(MOSFET_PIN,0);       
+          retval=0;
           break;
+      case 'L':  // Turn on mosfet //////////////////////////////////////////////////////////////////////////////////////////
+          digitalWrite(MOSFET_PIN,1);       
+          retval=1;
+          break;          
       case 'M':  // Missing seconds to start raspberry //////////////////////////////////////////////////////////////////////
           if (!rasp_running) {
              now=RTC.now(); 
@@ -512,6 +516,10 @@ void setup() {
   pinMode(MOSFET_PIN, OUTPUT);
   pinMode(OK_LED_PIN, OUTPUT);  
   pinMode(FAIL_LED_PIN, OUTPUT);
+  // Reset pins
+  digitalWrite(RELAY_SET_PIN,0);
+  digitalWrite(RELAY_RESET_PIN,0);  
+  digitalWrite(MOSFET_PIN,0); 
   // Inizialize I/O
   Serial.begin(BAUD_RATE); // Start Serial connection
 
