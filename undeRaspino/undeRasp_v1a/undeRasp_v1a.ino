@@ -11,15 +11,17 @@
 #define RTC_INIT_FAIL "FATAL: RTC error"
 #define LOWBAT "Low battery to start Raspberry"
 #define RASP_FAIL "Unable to powerup Raspberry"
+#define RASP_NO_HB "Unable to receive Heartbeat from Raspberry"
 #define MENU1 "\nA\tpower used(A)\nC\tARD temperature\nd/D\tread/write EEPROM datestam (YYMMDDHHMMXXX)\nE/e\tclear/read last error in eprom"
 #define MENU2 "\nH/h\tset/read heartbeat\nK/k\tenable/disable RB serial out\nL/l\tTurn on/off mosfet\nM\tmissing time to start RB\nP/p\tenable/disable ARD serial out\nQ\tQuit RB"
 #define MENU3 "\nS/s\tstart/stop RB relay\nT/t\tSet/read RTC (YYMMDDHHMMSS)\nV\tread voltage\nW\tread watt\n?\tPrint his menu"
 
 // ERR CODES
-#define I2C_ERRCODE 0x81
-#define RTC_ERRCODE 0x82
-#define LOWBAT_ERRCODE 0x83
-#define RASP_FAIL_ERRCODE 0x84
+#define I2C_ERRCODE 81
+#define RTC_ERRCODE 82
+#define LOWBAT_ERRCODE 83
+#define RASP_FAIL_ERRCODE 84
+#define RASP_NO_HB_ERRCODE 85
 
 // CONFIG
 #define VCC 3.3
@@ -45,12 +47,13 @@
 #define TRY_DELAY 30              // delay (between tests) in seconds
 #define MIN_BATTERY_VOLTAGE 9     // minimum voltage to start raspberry in safe
 #define MIN_RASPBERRY_DELAY 10    // in minutes
+#define ALT_SAMPLING_TIME 120     // alternative sampling time in case of heartbeat fail. In seconds
 
 // INCLUDES
 #include <Wire.h>
 #include "RTClib.h"
 #include <EEPROM.h>
-#include <avr/wdt.h>
+//#include <avr/wdt.h>      // Watchdog actually not working on arduino pro mini :( Stuks in a reset loop
 
 // GLOBAL VARS
 RTC_DS1307 RTC;
@@ -62,15 +65,16 @@ bool halt_request=false;  // raspberry asks for halt
 bool heartbeat=false;     // Setted from raspberry via i2c
 double i2c_val;           // return value for i2c operations
 uint32_t wt=0;            // waketime unix stamp
+int unresponsive_count=0; // time incremental counter used in failure cases
 
 /*
  * Function error_handler(errcode, msg)
  * 1) prints an error message on serial connection
  * 2) sets a errcode in eeprom 
  * 3) sets to true global variable error_status
- * 4) turns on a red led [TODO]
+ * 4) turns on a red led
  */
-void error_handler(byte errcode, const char * msg){
+void error_handler(char errcode, const char * msg){
    Serial.println(msg);
    error_status=true; 
    EEPROM.write(7,errcode);
@@ -254,16 +258,17 @@ int start_raspberry(){
       for (int i=0; i<MAX_TRY; i++){
          for (int j=0;j<TRY_DELAY;j++){
             delay(1000);
-            wdt_reset();
+            //wdt_reset();
             if (heartbeat) {
-               Serial.write("Ricevuto heartbeat"); // debug
-               blink_led();
-               i=MAX_TRY;  // exiting loop
+               Serial.println("Ricevo heartbeat");
+               i=MAX_TRY;   // exiting from delay loop
+               break;
+               
             }
          }
       }      
       if (!heartbeat){
-            Serial.println("Raspberry non partita"); //Debug            
+         error_handler(RASP_NO_HB_ERRCODE,RASP_NO_HB);
       } 
       heartbeat=false;     // Reset heartbeat
    } else {
@@ -378,6 +383,7 @@ double user_interface (char *cmd_string){
           break;
       case 'e':  // read last error in EPROM ////////////////////////////////////////////////////////////////////////////////
           retval=EEPROM.read(7);
+          break;
       case 'H':  // set earthbit ////////////////////////////////////////////////////////////////////////////////////////////
           heartbeat=true;
           retval=1;    
@@ -507,6 +513,8 @@ void i2c_send(){
 
 
 void setup() {
+  // Enable watchdog (8 secs)
+  // wdt_enable(WDTO_8S);
   // Set ports
   pinMode(SERIAL_ARDUINO_PIN, OUTPUT);
   pinMode(SERIAL_RASPBERRY_PIN, OUTPUT);
@@ -525,7 +533,8 @@ void setup() {
 
   // Check if raspberry is running (due arduino reset a/o watchdog)
   if (digitalRead(RASPBERRY_STATUS_PIN)) rasp_running=true;
-
+  Serial.println("Provo a piantare il watchdog");
+//  delay(20000);
   // Inizialize I2C
   Wire.begin(I2C_ADDRESS); // Start I2C
   RTC.begin();             // Start the RTC clock
@@ -534,15 +543,18 @@ void setup() {
         error_handler(I2C_ERRCODE,I2C_INIT_FAIL);
      } else {
         // Check RTC is working
-        if(! RTC.isrunning()) error_handler(RTC_ERRCODE,RTC_INIT_FAIL);
-        now=RTC.now();
-        if (now.unixtime()<RTC_MIN_DATE) error_handler(RTC_ERRCODE,RTC_INIT_FAIL);
-        // Initialize wakeup time register
-        update_waketime();
-        // Chect wakeuptime, if is before now, set to now
-        if (wt<now.unixtime()) {         // if the waketime is passed
-           next_waketime();              // and increase of timestep
-           warning_led();                // notify with warning light
+        if(! RTC.isrunning()){
+           error_handler(RTC_ERRCODE,RTC_INIT_FAIL);
+        } else {
+           now=RTC.now();
+           if (now.unixtime()<RTC_MIN_DATE) error_handler(RTC_ERRCODE,RTC_INIT_FAIL);
+           // Initialize wakeup time register
+           update_waketime();
+           // Chect wakeuptime, if is before now, set to now
+           if (wt<now.unixtime()) {         // if the waketime is passed
+              next_waketime();              // and increase of timestep
+              warning_led();                // notify with warning light
+           }
         }
      } 
   } else blink_led();  // debug
@@ -550,8 +562,6 @@ void setup() {
   Wire.onReceive(i2c_receive);
   Wire.onRequest(i2c_send);
 
-  // Enable watchdog (8 secs)
-  wdt_enable(WDTO_8S);
   
   // Finally
   if (!error_status) {
@@ -560,6 +570,10 @@ void setup() {
      digitalWrite(OK_LED_PIN,1);  // Turn on green led
      delay (2000);
      digitalWrite(OK_LED_PIN,0);  // Turn off led
+  } else {
+     // prepare underaspino to work in unresponsive way
+     wt=EEPROM.read(6)*60;  // Calculate wait time
+     if (wt<MIN_RASPBERRY_DELAY*60) wt=MIN_RASPBERRY_DELAY*60;
   }
 }
 
@@ -568,36 +582,68 @@ void setup() {
  ********************************************************************/
 
 void loop() {
-  if(!error_status){
-     if(!rasp_running){
-        now=RTC.now();
-        if(wt<now.unixtime()){
-           start_raspberry();
-        } //end cycle raspberry not running
-     } else { //raspberry running
-        // Serial.println(heartbeat); TODO: gestione heartbeat
-        heartbeat=false;
-        if (halt_request) {
-          // for long delay is needed to split in part to avoid watchdog reset
-          for (int i=0;i<=RASP_SHUTDOWN_TIME;i++){
-             delay(1000);
-             wdt_reset();
-          }
-          delay(RASP_SHUTDOWN_TIME);
-          // first all, avoiding fast restart adding MIN_RASPBERRY_DELAY
-          now=RTC.now();
-          if (wt<now.unixtime()) wt=now.unixtime()+MIN_RASPBERRY_DELAY*60;   
-          rasp_relay(false);
-          halt_request=false;
+  if(!error_status){                // if no error...
+     if(!rasp_running){             // when raspberry is off
+        now=RTC.now();              // check the time
+        if(wt<now.unixtime()){      // if it's time to start...
+           start_raspberry();       // ... start
+        } 
+     } else {                       // if raspberry is running...
+        if (!heartbeat){            // if raspberry doesn't set heartbeat.... 
+           // Without heartbeat, wait for fixed time
+           for (int i=0;i<=ALT_SAMPLING_TIME;i++){
+              delay(1000);
+              //wdt_reset();
+              if (heartbeat) break;
+           }
+           if (!heartbeat) { // if not heartbeat received after delay
+              // Calculate next restart... 
+              now=RTC.now();
+              if (wt<now.unixtime()) wt=now.unixtime()+MIN_RASPBERRY_DELAY*60;   
+              rasp_relay(false);        // ... and stop raspberry 
+              EEPROM.write(7,RASP_NO_HB_ERRCODE); // issue error on EEPROM             
+           }                     
+        }
+        heartbeat=false;            // reset heartbeat
+        if (halt_request) {         // if it's time to stop
+           // for long delay is needed to split in part to avoid watchdog reset
+           for (int i=0;i<=RASP_SHUTDOWN_TIME;i++){
+              delay(1000);
+              //wdt_reset();
+           }
+           // before stop, avoiding fast restart adding MIN_RASPBERRY_DELAY
+           now=RTC.now();
+           if (wt<now.unixtime()) wt=now.unixtime()+MIN_RASPBERRY_DELAY*60;   
+           rasp_relay(false);        // stop raspberry
+           halt_request=false;       // clear request 
         }
      } //end cycle rasberry runnuing
-  } else { // error status setted
-    
+  } else { 
+     // if I2C or RTC are not working, try to work with raspberry in unresponsive way
+     if (EEPROM.read(7)==I2C_ERRCODE or EEPROM.read(7)==RTC_ERRCODE)
+     { 
+         if (!rasp_running){  // wait cycle
+            if (unresponsive_count++>wt) {  // if is time...
+              digitalWrite(FAIL_LED_PIN,0); // ... turn off red light
+              wt=ALT_SAMPLING_TIME+RASP_SHUTDOWN_TIME*2;; // calculate running time
+              rasp_relay(true);             // turn on raspberry
+              unresponsive_count=0;         // reset counter
+            }
+         } else { // work delay cycle
+            if (unresponsive_count++>wt) {  // if is time...
+              digitalWrite(FAIL_LED_PIN,0); // ... turn off red light
+              wt=EEPROM.read(6)*60;  // recalculate wait time
+              if (wt<MIN_RASPBERRY_DELAY*60) wt=MIN_RASPBERRY_DELAY*60;
+              rasp_relay(false);            // turn off raspberry
+              unresponsive_count=0;         // reset counter
+            }
+         }
+     }
   }
-  delay(3000);
-  wdt_reset();
+  delay(1000);  // DO NOT CHANGE
+  //wdt_reset();
+  Serial.print(wt);
+  Serial.print("-");
+  Serial.println(unresponsive_count); // debug
 }
 
-
-
-//TODO: watchdog
