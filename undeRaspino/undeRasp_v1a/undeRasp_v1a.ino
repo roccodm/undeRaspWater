@@ -9,12 +9,14 @@
 #define START_MSG "\n\nUnderRaspino Ready."
 #define I2C_INIT_FAIL "FATAL: i2c bus error"
 #define RTC_INIT_FAIL "FATAL: RTC error"
-#define LOWBAT "Low battery to start Raspberry"
-#define RASP_FAIL "Unable to powerup Raspberry"
-#define RASP_NO_HB "Unable to receive Heartbeat from Raspberry"
+#define LOWBAT "Low battery to start RB"
+#define RASP_FAIL "Unable to powerup RB"
+#define RASP_NO_HB "Unable to receive Heartbeat from RB"
+#define RASP_STARTING "Starting RB"
+#define RASP_STOP "RB stopped"
 #define MENU1 "\nA\tpower used(A)\nC\tARD temperature\nd/D\tread/write EEPROM datestam (YYMMDDHHMMXXX)\nE/e\tclear/read last error in eprom"
-#define MENU2 "\nH/h\tset/read heartbeat\nK/k\tenable/disable RB serial out\nL/l\tTurn on/off mosfet\nM\tmissing time to start RB\nP/p\tenable/disable ARD serial out\nQ\tQuit RB"
-#define MENU3 "\nS/s\tstart/stop RB relay\nT/t\tSet/read RTC (YYMMDDHHMMSS)\nV\tread voltage\nW\tread watt\n?\tPrint his menu"
+#define MENU2 "\nH/h\tset/read heartbeat\nK/k\tenable/disable RB serial out\nL/l\tTurn on/off mosfet\nM\tSecs left to start RB\nO/o\tset/read keep on RB (use q to quit)\nP/p\tenable/disable ARD serial out\nQ\tQuit RB"
+#define MENU3 "\nR\tRB running status\nS/s\tstart/stop RB relay\nT/t\tSet/read RTC (YYMMDDHHMMSS)\nV\tread voltage\nW\tread watt\n?\tPrint this menu"
 
 // ERR CODES
 #define I2C_ERRCODE 81
@@ -53,7 +55,7 @@
 #include <Wire.h>
 #include "RTClib.h"
 #include <EEPROM.h>
-//#include <avr/wdt.h>      // Watchdog actually not working on arduino pro mini :( Stuks in a reset loop
+//#include <avr/wdt.h>      // Watchdog actually not working on arduino pro mini :( Stuks in a reset loop 
 
 // GLOBAL VARS
 RTC_DS1307 RTC;
@@ -62,6 +64,7 @@ char buffer[BUFFSIZE];    // general purpose global buffer
 bool error_status=false;  // flag setted up in case of fatal errors
 bool rasp_running=false;  // raspberry running status flag
 bool halt_request=false;  // raspberry asks for halt
+bool keep_on=false;
 bool heartbeat=false;     // Setted from raspberry via i2c
 double i2c_val;           // return value for i2c operations
 uint32_t wt=0;            // waketime unix stamp
@@ -242,7 +245,7 @@ void next_waketime(){
 
 int start_raspberry(){
    if (user_interface("V")>MIN_BATTERY_VOLTAGE){     // if enought battery...
-      Serial.println("Starting raspberry");
+      Serial.println(RASP_STARTING);
       next_waketime();    // calculate next waketime
       rasp_relay(true);   // turn on raspberry
       // check raspberry feedback
@@ -282,6 +285,8 @@ int start_raspberry(){
  */
 double quit_raspberry(){
    halt_request=true;
+   keep_on=false;
+   Serial.println(RASP_STOP);
    return 1;
 }
 
@@ -378,7 +383,7 @@ double user_interface (char *cmd_string){
           retval=set_eprom_datetime(str);
           break;
       case 'E':  // clear last error in EPROM ///////////////////////////////////////////////////////////////////////////////
-          EEPROM.write(0,0);
+          EEPROM.write(7,0);
           retval=1;
           break;
       case 'e':  // read last error in EPROM ////////////////////////////////////////////////////////////////////////////////
@@ -414,22 +419,35 @@ double user_interface (char *cmd_string){
              retval=wt-now.unixtime();
           }
           break;
+      case 'O':  // keep on raspberry ///////////////////////////////////////////////////////////////////////////////////////
+          keep_on=true;
+          retval=1;    
+          break;
+      case 'o':  // read heartbeat //////////////////////////////////////////////////////////////////////////////////////////
+          retval=keep_on;    
+          break; 
       case 'P':  // enable arduino serial output (and disable raspberry output) /////////////////////////////////////////////
           digitalWrite(SERIAL_ARDUINO_PIN,1);       
           digitalWrite(SERIAL_RASPBERRY_PIN,0);
           Serial.println(START_MSG);
           user_interface("?");
+          retval=1;
           break;     
       case 'p':  // disable arduino serial output //////////////////////////////////////////////////////////////////////////
           digitalWrite(SERIAL_ARDUINO_PIN,0);
+          retval=1;
           break; 
       case 'Q':  // quit raspberry with delay ///////////////////////////////////////////////////////////////////////////////
           retval=quit_raspberry();
+          break;
+      case 'R':  // return raspberry running status /////////////////////////////////////////////////////////////////////////
+          retval=rasp_running;
           break;
       case 'S':   // Start raspberry ////////////////////////////////////////////////////////////////////////////////////////        
           retval=rasp_relay(true);
           break;
       case 's':   // Stop raspberry immediately//////////////////////////////////////////////////////////////////////////////
+          keep_on=false;
           retval=rasp_relay(false);
           break;
       case 'T':  // set rtc datetime ////////////////////////////////////////////////////////////////////////////////////////
@@ -445,7 +463,7 @@ double user_interface (char *cmd_string){
       case 't':  // return time /////////////////////////////////////////////////////////////////////////////////////////////
           if (!rasp_running) {
              now=RTC.now();
-             sprintf(buffer,"%02d/%02d/%04d %02d:%02d:%02d",now.day(),now.month(),
+             sprintf(buffer,"%02d/%02d/%04d %02d.%02d.%02d",now.day(),now.month(),
                             now.year(),now.hour(),now.minute(),now.second());
              retval=-2;  // means print buffer
           }
@@ -460,6 +478,7 @@ double user_interface (char *cmd_string){
           Serial.print(MENU1);
           Serial.print(MENU2);
           Serial.println(MENU3);          
+          retval=1;
           break;          
           
    }
@@ -528,13 +547,13 @@ void setup() {
   digitalWrite(RELAY_SET_PIN,0);
   digitalWrite(RELAY_RESET_PIN,0);  
   digitalWrite(MOSFET_PIN,0); 
+  digitalWrite(SERIAL_ARDUINO_PIN,1);
   // Inizialize I/O
   Serial.begin(BAUD_RATE); // Start Serial connection
 
   // Check if raspberry is running (due arduino reset a/o watchdog)
   if (digitalRead(RASPBERRY_STATUS_PIN)) rasp_running=true;
-  Serial.println("Provo a piantare il watchdog");
-//  delay(20000);
+
   // Inizialize I2C
   Wire.begin(I2C_ADDRESS); // Start I2C
   RTC.begin();             // Start the RTC clock
@@ -617,7 +636,7 @@ void loop() {
            rasp_relay(false);        // stop raspberry
            halt_request=false;       // clear request 
         }
-     } //end cycle rasberry runnuing
+     } //end cycle rasberry running
   } else { 
      // if I2C or RTC are not working, try to work with raspberry in unresponsive way
      if (EEPROM.read(7)==I2C_ERRCODE or EEPROM.read(7)==RTC_ERRCODE)
@@ -641,9 +660,7 @@ void loop() {
      }
   }
   delay(1000);  // DO NOT CHANGE
-  //wdt_reset();
-  Serial.print(wt);
-  Serial.print("-");
-  Serial.println(unresponsive_count); // debug
+ 
+
 }
 
