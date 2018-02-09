@@ -1,8 +1,23 @@
 #include "defines.h"
 #include "rpi.h"
 
-bool is_rpi_running() {
+bool rpi_is_running() {
 	return digitalRead(RASPBERRY_STATUS_PIN) == 1;
+}
+
+bool rpi_is_first_start() {
+	return first_start;
+}
+
+void rpi_handle_checks() {
+	// first run, rpi will do self test and shutdown
+	if (!rpi_started) {
+		start_rpi();
+	} else if (!rpi_is_running() && rpi_cooldown > RPI_START_COOLDOWN) {
+		// rpi shutdown?! enter normal operation mode
+		first_start = false;
+		stop_rpi();
+	}
 }
 
 void start_rpi() {

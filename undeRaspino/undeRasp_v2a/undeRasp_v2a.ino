@@ -50,17 +50,8 @@ void loop() {
 	if (error_status) {
 		return;  // Disable loop if an error happend
 	}
-	if (first_start) {
-		// do first run, raspberry will do self test and shutdown
-		if (!rpi_started) {
-			start_rpi();
-		} else if (!is_rpi_running() &&
-			   rpi_cooldown > RPI_START_COOLDOWN) {
-			// raspberry has shutdown?! reset first start, entering
-			// normal operation mode
-			first_start = false;
-			stop_rpi();
-		}
+	if (rpi_is_first_start()) {
+		rpi_handle_checks();
 	} else {
 	}
 }

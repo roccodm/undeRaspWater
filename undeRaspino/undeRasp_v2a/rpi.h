@@ -8,6 +8,8 @@ bool rpi_started = false;  // set to true when rpi has been started
 void rpi_cooldown_update();
 void start_rpi();
 void stop_rpi();
-bool is_rpi_running();
+bool rpi_is_running();
+bool rpi_is_first_start();
+void rpi_handle_checks();
 
 #endif
