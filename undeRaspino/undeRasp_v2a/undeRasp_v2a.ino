@@ -3,14 +3,12 @@
 #include <Wire.h>
 #include "RTClib.h"
 #include "defines.h"
+#include "rpi.h"
 
 // GLOBAL VARS
 RTC_DS1307 RTC;
 DateTime now;
 char buffer[BUFFSIZE];      // general purpose global buffer
-bool first_start = true;    // true when first start, used to run self-checks
-int rpi_cooldown = 0;       // the rpi start/stop cooldown
-bool rpi_started = false;   // set to true when rpi has been started
 bool error_status = false;  // flag setted up in case of fatal errors
 double i2c_val;		    // return value for i2c operations
 
@@ -47,30 +45,6 @@ void i2c_receive(int count) {
 }
 
 void i2c_send() { Wire.write(buffer); }
-
-void start_rpi() {
-#if DEBUG
-	Serial.println("Starting raspberry");
-#endif
-	digitalWrite(RELAY_SET_PIN, 1);
-	delay(100);
-	digitalWrite(RELAY_SET_PIN, 0);
-	rpi_started = true;
-	rpi_cooldown = 0;
-}
-
-void stop_rpi() {
-#if DEBUG
-	Serial.println("Stopping raspberry");
-#endif
-	digitalWrite(RELAY_RESET_PIN, 1);
-	delay(100);
-	digitalWrite(RELAY_RESET_PIN, 0);
-	rpi_started = false;
-	rpi_cooldown = 0;
-}
-
-bool is_rpi_running() { return digitalRead(RASPBERRY_STATUS_PIN) == 1; }
 
 void loop() {
 	if (error_status) {
@@ -149,7 +123,6 @@ void setup() {
 	TCCR1B |= (1 << CS12) | (0 << CS11) | (0 << CS10);
 	// enable timer compare interrupt
 	TIMSK1 |= (1 << OCIE1A);
-	sei();  // allow interrupts
 
 	sei();  // allow interrupts
 }
@@ -170,10 +143,5 @@ ISR(TIMER1_COMPA_vect) {
 	dbg_timer();  // used for serial debug, disable when going live
 #endif
 
-	// rpi start/stop cooldown
-	if (rpi_started && rpi_cooldown < RPI_START_COOLDOWN) {
-		rpi_cooldown += 1;
-	} else if (!rpi_started && rpi_cooldown < RPI_STOP_COOLDOWN) {
-		rpi_cooldown += 1;
-	}
+	rpi_cooldown_update();
 }
