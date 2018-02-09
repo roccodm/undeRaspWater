@@ -7,27 +7,64 @@
 #include "utils.h"
 
 // GLOBAL VARS
-RTC_DS1307 RTC;
-DateTime now;
 char buffer[BUFFSIZE];      // general purpose global buffer
-bool error_status = false;  // flag setted up in case of fatal errors
 double i2c_val;		    // return value for i2c operations
 
-void error_handler(char errcode, const char *msg) {
-	Serial.println(msg);
-	error_status = true;
-	EEPROM.write(EEPROM_ERR_LOCATION, errcode);
-	digitalWrite(OK_LED_PIN, 0);
-	digitalWrite(FAIL_LED_PIN, 1);  // Turn on red led
-}
-
 double user_interface(char *cmd_string) {
-	char str[20];
 	int i;
 	int dpow;
 	char cmd = cmd_string[0];
 	double retval = -1;
 	switch (cmd) {
+		case 'd':  // read Eprom Date
+			retval = get_eeprom_datetime(buffer);
+			break;
+		case 'D':  // set Eprom Date
+			retval = set_eeprom_datetime(cmd_string, buffer);
+			rpi_update_waketime();
+			break;
+		case 'E':  // clear last error in EPROM
+			reset_error();
+			retval = 1;
+			break;
+		case 'e':  // read last error in EPROM
+			retval = EEPROM.read(7);
+			break;
+		case 'K':  // enable raspberry serial output (and disable
+			   // arduino output)
+			rpi_set_serial_enabled(true);
+			retval = 1;
+			break;
+		case 'k':  // disable raspberry serial output (and enable
+			   // arduino output)
+			rpi_set_serial_enabled(false);
+			retval = 1;
+			break;
+		case 'L':  // Turn on mosfet
+			set_mosfet_enabled(true);
+			retval = 1;
+			break;
+		case 'l':  // Turn off mosfet
+			set_mosfet_enabled(false);
+			retval = 0;
+			break;
+		case 'z':  // Seconds left before starting raspberry
+			retval = rpi_get_restart_time_left();
+			break;
+		case 'T':  // set rtc datetime
+			if (!rpi_is_running()) {
+				retval = set_rtc_time_s(cmd_string, buffer);
+			}
+			break;
+		case 't':  // return time
+			if (!rpi_is_running()) {
+				retval = get_rtc_time_s(buffer);
+			}
+			break;
+		case '?':  // print menu
+			print_menu();
+			retval = 1;
+			break;
 		case 'o':
 			rpi_set_keepalive(false);
 			retval = 0;
@@ -70,7 +107,7 @@ double user_interface(char *cmd_string) {
 			if (strlen(cmd_string) < 2) break;
 			retval = 0;
 			dpow = 1;
-			for (i = strlen(cmd_string)-1; i > 0; i--) {
+			for (i = strlen(cmd_string) - 1; i > 0; i--) {
 				if (cmd_string[i] < 48 or cmd_string[i] > 57)
 					continue;
 				retval += (cmd_string[i] - 48) * dpow;
@@ -102,7 +139,7 @@ void serialEvent() {
 	char data = 0;
 	int i = 0;
 	double retval;
-	delay(50); // FIXME ugly hack
+	delay(50);  // FIXME ugly hack
 	while (Serial.available()) {
 		data = Serial.read();
 		if (i < BUFFSIZE - 1) buffer[i++] = data;
@@ -166,11 +203,11 @@ void setup() {
 	Wire.begin(I2C_ADDRESS);  // Start I2C
 	RTC.begin();		  // Start the RTC clock
 	if (analogRead(I2C_SDA) < 900 || analogRead(I2C_SCL) < 900) {
-		error_handler(I2C_ERRCODE, I2C_INIT_FAIL);
+		set_error(I2C_ERRCODE, I2C_INIT_FAIL);
 	} else {
 		// Check RTC is working
 		if (!RTC.isrunning()) {
-			error_handler(RTC_ERRCODE, RTC_INIT_FAIL);
+			set_error(RTC_ERRCODE, RTC_INIT_FAIL);
 		}
 	}
 
