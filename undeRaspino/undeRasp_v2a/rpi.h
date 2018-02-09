@@ -13,10 +13,13 @@ bool rpi_keepalive = false; // set true to prevent RPI shutdown
 bool rpi_heartbeat = false; // set true by raspberry to signal it's running status
 int rpi_heartbeat_cooldown = 0; // the heartbeat cooldown status
 
+void rpi_set_run_mode(uint8_t mode);
+uint8_t rpi_get_run_mode();
 void rpi_cooldown_update();
 void rpi_start();
 void rpi_stop();
 bool rpi_is_running();
+bool rpi_has_power();
 bool rpi_is_first_start();
 void rpi_handle_checks();
 void rpi_handle_ops();

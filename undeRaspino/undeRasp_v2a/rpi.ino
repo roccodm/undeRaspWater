@@ -1,5 +1,16 @@
 #include "defines.h"
 #include "rpi.h"
+#include <EEPROM.h>
+
+void rpi_set_run_mode(uint8_t mode) {
+	EEPROM.write(EEPROM_MODE_LOCATION, mode);
+};
+
+uint8_t rpi_get_run_mode() {
+	uint8_t ret = EEPROM.read(EEPROM_MODE_LOCATION);
+	if (rpi_is_first_start()) ret |= 0x80;
+	return ret;
+}
 
 void rpi_set_heartbeat(bool on) {
 	rpi_heartbeat = on;
@@ -11,7 +22,11 @@ bool rpi_get_heartbeat() { return rpi_heartbeat; }
 
 void rpi_set_keepalive(bool on) { rpi_keepalive = on; }
 
-bool rpi_is_running() { return digitalRead(RASPBERRY_STATUS_PIN) == 1; }
+bool rpi_has_power() { return digitalRead(RASPBERRY_STATUS_PIN) == 1; }
+
+bool rpi_is_running() {
+	return rpi_has_power() && (rpi_cooldown < RPI_START_COOLDOWN || rpi_get_heartbeat());
+}
 
 bool rpi_is_first_start() { return first_start; }
 
@@ -19,7 +34,7 @@ void rpi_handle_checks() {
 	// first run, rpi will do self test and shutdown
 	if (!rpi_started) {
 		rpi_start();
-	} else if (!rpi_is_running() && rpi_cooldown > RPI_START_COOLDOWN) {
+	} else if (!rpi_is_running()) {
 		if (rpi_keepalive) return;
 		// rpi shutdown?! enter normal operation mode
 		first_start = false;

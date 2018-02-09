@@ -3,8 +3,8 @@
 #include <Wire.h>
 #include "RTClib.h"
 #include "defines.h"
-#include "utils.h"
 #include "rpi.h"
+#include "utils.h"
 
 // GLOBAL VARS
 RTC_DS1307 RTC;
@@ -24,6 +24,7 @@ void error_handler(char errcode, const char *msg) {
 double user_interface(char *cmd_string) {
 	char str[20];
 	int i;
+	int dpow;
 	char cmd = cmd_string[0];
 	double retval = -1;
 	switch (cmd) {
@@ -65,6 +66,24 @@ double user_interface(char *cmd_string) {
 		case 'c':
 			retval = get_temperature();
 			break;
+		case 'M':
+			if (strlen(cmd_string) < 2) break;
+			retval = 0;
+			dpow = 1;
+			for (i = strlen(cmd_string)-1; i > 0; i--) {
+				if (cmd_string[i] < 48 or cmd_string[i] > 57)
+					continue;
+				retval += (cmd_string[i] - 48) * dpow;
+				dpow *= 10;
+			}
+			if (retval > 127)
+				retval = -1;
+			else
+				rpi_set_run_mode(retval);
+			break;
+		case 'm':
+			retval = rpi_get_run_mode();
+			break;
 		default:
 			break;  // unknown command
 	}
@@ -83,6 +102,7 @@ void serialEvent() {
 	char data = 0;
 	int i = 0;
 	double retval;
+	delay(50); // FIXME ugly hack
 	while (Serial.available()) {
 		data = Serial.read();
 		if (i < BUFFSIZE - 1) buffer[i++] = data;
@@ -168,7 +188,7 @@ void setup() {
 	}
 
 	// Check initial RPI status
-	rpi_started = rpi_is_running();
+	rpi_started = rpi_has_power();
 
 	cli();  // stop interrupts
 

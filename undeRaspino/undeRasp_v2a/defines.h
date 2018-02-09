@@ -50,3 +50,4 @@
 #define MIN_BATTERY_VOLTAGE 9  // minimum voltage to start raspberry in safe
 
 #define EEPROM_ERR_LOCATION 7
+#define EEPROM_MODE_LOCATION 8
