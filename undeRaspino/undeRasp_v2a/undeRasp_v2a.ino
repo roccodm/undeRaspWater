@@ -3,6 +3,7 @@
 #include <Wire.h>
 #include "RTClib.h"
 #include "defines.h"
+#include "utils.h"
 #include "rpi.h"
 
 // GLOBAL VARS
@@ -33,6 +34,36 @@ double user_interface(char *cmd_string) {
 		case 'O':
 			rpi_set_keepalive(true);
 			retval = 1;
+			break;
+		case 'r':
+			retval = rpi_is_running();
+			break;
+		case 'v':
+			retval = get_voltage();
+			break;
+		case 'a':
+			retval = get_ampere();
+			break;
+		case 'w':
+			retval = get_watts();
+			break;
+		case 'S':
+			rpi_start();
+			retval = 1;
+			break;
+		case 's':
+			rpi_stop();
+			retval = 0;
+			break;
+		case 'H':
+			rpi_set_heartbeat(true);
+			retval = 1;
+			break;
+		case 'h':
+			retval = rpi_get_heartbeat();
+			break;
+		case 'c':
+			retval = get_temperature();
 			break;
 		default:
 			break;  // unknown command
@@ -135,6 +166,9 @@ void setup() {
 		delay(2000);
 		digitalWrite(OK_LED_PIN, 0);  // Turn off led
 	}
+
+	// Check initial RPI status
+	rpi_started = rpi_is_running();
 
 	cli();  // stop interrupts
 

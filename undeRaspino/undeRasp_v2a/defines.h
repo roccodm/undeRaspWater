@@ -1,9 +1,5 @@
 #define DEBUG 1
 
-// TIMERS
-#define RPI_START_COOLDOWN 60
-#define RPI_STOP_COOLDOWN 60
-
 // Messages
 #define START_MSG "\n\nUnderRaspino Ready."
 #define I2C_INIT_FAIL "FATAL: i2c bus error"
