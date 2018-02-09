@@ -26,10 +26,45 @@ double user_interface(char *cmd_string) {
 	char cmd = cmd_string[0];
 	double retval = -1;
 	switch (cmd) {
+		case 'o':
+			rpi_set_keepalive(false);
+			retval = 0;
+			break;
+		case 'O':
+			rpi_set_keepalive(true);
+			retval = 1;
+			break;
 		default:
 			break;  // unknown command
 	}
 	return retval;
+}
+
+/*
+ * Function serialEvent()
+ * Is called in case of serialEvent
+ * 1) assembles the command string
+ * 2) calls the user_interface function
+ * input is trunked at BUFF_SIZE max lenght
+ */
+
+void serialEvent() {
+	char data = 0;
+	int i = 0;
+	double retval;
+	while (Serial.available()) {
+		data = Serial.read();
+		if (i < BUFFSIZE - 1) buffer[i++] = data;
+	}
+	buffer[i] = '\0';
+	Serial.print("CMD ");
+	Serial.print(buffer);
+	Serial.print(":");
+	retval = user_interface(buffer);
+	if (retval == -2)
+		Serial.println(buffer);
+	else
+		Serial.println(retval);
 }
 
 void i2c_receive(int count) {
@@ -53,6 +88,7 @@ void loop() {
 	if (rpi_is_first_start()) {
 		rpi_handle_checks();
 	} else {
+		rpi_handle_ops();
 	}
 }
 

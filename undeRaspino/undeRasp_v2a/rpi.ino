@@ -1,24 +1,25 @@
 #include "defines.h"
 #include "rpi.h"
 
-bool rpi_is_running() {
-	return digitalRead(RASPBERRY_STATUS_PIN) == 1;
-}
+void rpi_set_keepalive(bool on) { rpi_keepalive = on; }
 
-bool rpi_is_first_start() {
-	return first_start;
-}
+bool rpi_is_running() { return digitalRead(RASPBERRY_STATUS_PIN) == 1; }
+
+bool rpi_is_first_start() { return first_start; }
 
 void rpi_handle_checks() {
 	// first run, rpi will do self test and shutdown
 	if (!rpi_started) {
 		start_rpi();
 	} else if (!rpi_is_running() && rpi_cooldown > RPI_START_COOLDOWN) {
+		if (rpi_keepalive) return;
 		// rpi shutdown?! enter normal operation mode
 		first_start = false;
 		stop_rpi();
 	}
 }
+
+void rpi_handle_ops() {}
 
 void start_rpi() {
 #if DEBUG
@@ -32,6 +33,7 @@ void start_rpi() {
 }
 
 void stop_rpi() {
+	if (rpi_keepalive) return;
 #if DEBUG
 	Serial.println("Stopping raspberry");
 #endif
