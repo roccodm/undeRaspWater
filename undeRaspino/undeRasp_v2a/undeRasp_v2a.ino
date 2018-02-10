@@ -92,11 +92,17 @@ double user_interface(char *cmd_string) {
 		case 'T':  // set RTC datetime
 			if (!rpi_is_running()) {
 				retval = set_rtc_time_s(cmd_string, buffer);
+			} else {
+				sprintf(buffer, "RPI is running");
+				retval = -2;
 			}
 			break;
 		case 't':  // get RTC datime
 			if (!rpi_is_running()) {
 				retval = get_rtc_time_s(buffer);
+			} else {
+				sprintf(buffer, "RPI is running");
+				retval = -2;
 			}
 			break;
 		case 'v':  // get voltage
