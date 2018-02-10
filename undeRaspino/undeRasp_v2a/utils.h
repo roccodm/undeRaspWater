@@ -4,7 +4,9 @@
 #include "defines.h"
 
 // simple atoi function
-bool atod(char *in, int offset, int size, char *data, char *err);
+bool atoi(char *in, int *out, char *err);
+// simple atoi function for dates (operate on each byte)
+bool atod(char *in, char *data, char *err);
 
 void print_menu();
 void set_error(uint8_t error);

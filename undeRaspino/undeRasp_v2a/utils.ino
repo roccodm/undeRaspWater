@@ -1,11 +1,5 @@
 #include "utils.h"
 
-void print_menu() {
-	Serial.print(MENU1);
-	Serial.print(MENU2);
-	Serial.println(MENU3);
-}
-
 bool atoi(char *in, int *out, char *err) {
 	int i;
 	int dpow = 1;
@@ -19,18 +13,14 @@ bool atoi(char *in, int *out, char *err) {
 	return true;
 }
 
-bool atod(char *in, int offset, int size, char *data, char *err) {
+bool atod(char *in, char *data, char *err) {
 	int i;
-	if (strlen(in) != size) {
-		if (err) sprintf(err, "too short");
-		return false;
-	}
-	for (i = offset; i < size; i++) {
+	for (i = 0; i < strlen(in); i++) {
 		if (in[i] < 48 || in[i] > 57) {
 			if (err) sprintf(err, "invalid char");
 			return false;
 		}
-		data[i - offset] = in[i] - 48;
+		data[i] = in[i] - 48;
 	}
 	return true;
 }
@@ -50,6 +40,25 @@ void reset_error() {
 	EEPROM.write(EEPROM_ERR_LOCATION, 0);
 }
 
+void print_menu() {
+	Serial.println("?\tprint this menu");
+	Serial.println("a\tpower used(A)");
+	Serial.println("c\ttemperature(C)");
+	Serial.println("D/d\twrite/read EEPROM datetime and delay (YYMMDDHHMMTTT)");
+	Serial.println("E/e\tclear/read last error in EEPROM");
+	Serial.println("H/h\tset/read heartbeat");
+	Serial.println("K/k\tenable/disable RB serial out");
+	Serial.println("L/l\tenable/disable mosfet");
+	Serial.println("M/m\tset/read current RPI working mode");
+	Serial.println("O/o\tset/read keep on RB");
+	Serial.println("r\tget RPI running status");
+	Serial.println("S/s\tstart/stop RPI");
+	Serial.println("T/t\tset/read RTC datetime (YYMMDDHHMMSS)");
+	Serial.println("v\tread current voltage");
+	Serial.println("w\tread current watts");
+	Serial.println("z\tSeconds left before starting RPI");
+}
+
 DateTime get_rtc_time() { return RTC.now(); }
 
 /*
@@ -60,7 +69,11 @@ DateTime get_rtc_time() { return RTC.now(); }
 
 double set_rtc_time_s(char *in, char* err) {
 	char data[20];
-	if (!atod(in, 1, 13, data, err)) return -2;  // error
+	if (strlen(in) != 12) {
+		if (err) sprintf(err, "too short");
+		return -2;
+	}
+	if (!atod(in, data, err)) return -2;  // error
 	int year = *data * 10 + *(data + 1);
 	int month = *(data + 2) * 10 + *(data + 3);
 	int day = *(data + 4) * 10 + *(data + 5);
@@ -100,7 +113,12 @@ double get_eeprom_datetime(char *out) {
  */
 double set_eeprom_datetime(char *in, char *out) {
 	char data[20];
-	if (!atod(in, 1, 14, data, out)) return -2;  // error
+
+	if (strlen(in) != 13) {
+		if (out) sprintf(out, "too short");
+		return -2;
+	}
+	if (!atod(in, data, out)) return -2;  // error
 
 	int year = *data * 10 + *(data + 1);
 	int month = *(data + 2) * 10 + *(data + 3);

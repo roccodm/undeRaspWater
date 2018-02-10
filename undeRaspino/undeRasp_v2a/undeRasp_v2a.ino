@@ -214,6 +214,9 @@ void setup() {
 	// Check initial RPI status
 	rpi_started = rpi_has_power();
 
+	// Print help menu
+	print_menu();
+
 	cli();  // stop interrupts
 
 	// TIMER 1 for interrupt frequency 1 Hz:

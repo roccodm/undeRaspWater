@@ -9,17 +9,6 @@
 #define RASP_NO_HB "Unable to receive Heartbeat from RB"
 #define RASP_STARTING "Starting RB"
 #define RASP_STOP "RB stopped"
-#define MENU1                                                             \
-	"\nA\tpower used(A)\nC\tARD temperature\nd/D\tread/write EEPROM " \
-	"datestam (YYMMDDHHMMXXX)\nE/e\tclear/read last error in eprom"
-#define MENU2                                                                \
-	"\nH/h\tset/read heartbeat\nK/k\tenable/disable RB serial "          \
-	"out\nL/l\tTurn on/off mosfet\nM\tSecs left to start "               \
-	"RB\nO/o\tset/read keep on RB (use q to quit)\nP/p\tenable/disable " \
-	"ARD serial out\nQ\tQuit RB"
-#define MENU3                                                                  \
-	"\nR\tRB running status\nS/s\tstart/stop RB relay\nT/t\tSet/read RTC " \
-	"(YYMMDDHHMMSS)\nV\tread voltage\nW\tread watt\n?\tPrint this menu"
 
 // ERR CODES
 #define I2C_ERRCODE 81
