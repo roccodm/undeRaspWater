@@ -6,7 +6,20 @@ void print_menu() {
 	Serial.println(MENU3);
 }
 
-bool datoi(char *in, int offset, int size, char *data, char *err) {
+bool atoi(char *in, int *out, char *err) {
+	int i;
+	int dpow = 1;
+	out = 0;
+	for (i = strlen(in) - 1; i > 0; i--) {
+		if (in[i] < 48 or in[i] > 57)
+			return false;
+		out += (in[i] - 48) * dpow;
+		dpow *= 10;
+	}
+	return true;
+}
+
+bool atod(char *in, int offset, int size, char *data, char *err) {
 	int i;
 	if (strlen(in) != size) {
 		if (err) sprintf(err, "too short");
@@ -47,7 +60,7 @@ DateTime get_rtc_time() { return RTC.now(); }
 
 double set_rtc_time_s(char *in, char* err) {
 	char data[20];
-	if (!datoi(in, 1, 13, data, err)) return -2;  // error
+	if (!atod(in, 1, 13, data, err)) return -2;  // error
 	int year = *data * 10 + *(data + 1);
 	int month = *(data + 2) * 10 + *(data + 3);
 	int day = *(data + 4) * 10 + *(data + 5);
@@ -87,7 +100,7 @@ double get_eeprom_datetime(char *out) {
  */
 double set_eeprom_datetime(char *in, char *out) {
 	char data[20];
-	if (!datoi(in, 1, 14, data, out)) return -2;  // error
+	if (!atod(in, 1, 14, data, out)) return -2;  // error
 
 	int year = *data * 10 + *(data + 1);
 	int month = *(data + 2) * 10 + *(data + 3);

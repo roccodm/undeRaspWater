@@ -17,7 +17,7 @@ int rpi_restart_delay = 0;
 
 void rpi_update_waketime();
 int rpi_get_restart_time_left();
-void rpi_set_run_mode(uint8_t mode);
+uint8_t rpi_set_run_mode(uint8_t mode);
 uint8_t rpi_get_run_mode();
 void rpi_cooldown_update();
 void rpi_start();

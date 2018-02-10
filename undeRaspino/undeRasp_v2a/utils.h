@@ -4,7 +4,7 @@
 #include "defines.h"
 
 // simple atoi function
-bool datoi(char *in, int offset, int size, char *data, char *err);
+bool atod(char *in, int offset, int size, char *data, char *err);
 
 void print_menu();
 void set_error(uint8_t error);

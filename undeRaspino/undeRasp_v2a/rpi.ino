@@ -28,8 +28,13 @@ void rpi_set_serial_enabled(bool enabled) {
 	}
 }
 
-void rpi_set_run_mode(uint8_t mode) {
-	EEPROM.write(EEPROM_MODE_LOCATION, mode);
+uint8_t rpi_set_run_mode_s(char *in, char *out) {
+	int dpow = 1;
+	int val;
+	if (!atoi(in, &val, out) || val > 127)
+		return -1;
+	EEPROM.write(EEPROM_MODE_LOCATION, val);
+	return val;
 };
 
 uint8_t rpi_get_run_mode() {
