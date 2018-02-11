@@ -13,7 +13,7 @@ void set_error(uint8_t error);
 uint8_t get_last_error();
 void reset_error();
 
-void set_mosfet_enabled(bool enabled);
+void set_mosfet(bool enabled);
 int get_pin_median(int pin, int delay = 0);
 double get_voltage();
 double get_ampere();

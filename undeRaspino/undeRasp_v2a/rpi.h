@@ -14,8 +14,12 @@ uint8_t rpi_set_run_mode(uint8_t mode);
 uint8_t rpi_get_run_mode();
 
 // Status
+int rpi_get_cooldown();
 bool rpi_get_status();
 bool rpi_has_power();
+void rpi_set_halting(bool enabled);
+void rpi_set_heartbeat(bool on);
+bool rpi_get_heartbeat();
 
 // Operations
 void rpi_handle_ops();
@@ -28,14 +32,10 @@ void rpi_update_waketime();
 int rpi_get_restart_time_left();
 
 // Manual mode
-void rpi_set_manual_mode(bool on);
+void rpi_set_manual(bool on);
 bool rpi_is_manual();
 
-// Heartbeat
-void rpi_set_heartbeat(bool on);
-bool rpi_get_heartbeat();
-
 // Serial status
-void rpi_set_serial_enabled(bool enabled);
+void rpi_set_serial(bool enabled);
 
 #endif

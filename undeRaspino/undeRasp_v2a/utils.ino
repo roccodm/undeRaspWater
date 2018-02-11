@@ -92,7 +92,7 @@ double get_rtc_datetime_s(char *out) {
 	return -2;
 }
 
-void set_mosfet_enabled(bool enabled) { digitalWrite(MOSFET_PIN, enabled); }
+void set_mosfet(bool enabled) { digitalWrite(MOSFET_PIN, enabled); }
 
 /*
  * Function get_eeprom_datetime()

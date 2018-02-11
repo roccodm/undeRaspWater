@@ -50,12 +50,14 @@ void rpi_update_waketime() {
 	rpi_restart_delay = EEPROM.read(6) * 60;
 }
 
+int rpi_get_cooldown() { return rpi_cooldown; }
+
 int rpi_get_restart_time_left() {
 	if (rpi_started) return -1;
 	return rpi_restart_delay - rpi_restart_timer;
 }
 
-void rpi_set_serial_enabled(bool enabled) {
+void rpi_set_serial(bool enabled) {
 	if (enabled) {
 		digitalWrite(SERIAL_ARDUINO_PIN, 0);
 		digitalWrite(SERIAL_RASPBERRY_PIN, 1);
@@ -85,9 +87,14 @@ void rpi_set_heartbeat(bool on) {
 	rpi_was_alive = true;
 }
 
+void rpi_set_halting(bool enabled) {
+	if (enabled) rpi_cooldown = 0;
+	rpi_halting = enabled;
+}
+
 bool rpi_get_heartbeat() { return rpi_heartbeat; }
 
-void rpi_set_manual_enabled(bool on) { rpi_manual = on; }
+void rpi_set_manual(bool on) { rpi_manual = on; }
 bool rpi_is_manual() { return rpi_manual; }
 
 bool rpi_has_power() { return digitalRead(RASPBERRY_STATUS_PIN) == 1; }

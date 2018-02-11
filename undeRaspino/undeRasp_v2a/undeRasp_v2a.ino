@@ -48,19 +48,19 @@ double user_interface(char *cmd_s) {
 			retval = rpi_get_heartbeat();
 			break;
 		case 'K':  // enable RPI/disable arduino serial output
-			rpi_set_serial_enabled(true);
+			rpi_set_serial(true);
 			retval = 1;
 			break;
 		case 'k':  // disable RPI/enable arduino serial output
-			rpi_set_serial_enabled(false);
+			rpi_set_serial(false);
 			retval = 1;
 			break;
 		case 'L':  // turn on mosfet
-			set_mosfet_enabled(true);
+			set_mosfet(true);
 			retval = 1;
 			break;
 		case 'l':  // turn off mosfet
-			set_mosfet_enabled(false);
+			set_mosfet(false);
 			retval = 0;
 			break;
 		case 'M':  // set operation mode
@@ -71,11 +71,19 @@ double user_interface(char *cmd_s) {
 			retval = rpi_get_run_mode();
 			break;
 		case 'O':  // set RPI manual mode
-			rpi_set_manual_enabled(true);
+			rpi_set_manual(true);
 			retval = 1;
 			break;
 		case 'o':  // unset RPI manual mode
-			rpi_set_manual_enabled(false);
+			rpi_set_manual(false);
+			retval = 0;
+			break;
+		case 'Q':
+			rpi_set_halting(true);
+			retval = 1;
+			break;
+		case 'q':
+			rpi_set_halting(false);
 			retval = 0;
 			break;
 		case 'R':
@@ -119,6 +127,9 @@ double user_interface(char *cmd_s) {
 			break;
 		case 'w':  // get watts
 			retval = get_watts();
+			break;
+		case 'x':  // get cooldown timer value
+			retval = rpi_get_cooldown();
 			break;
 		case 'z':  // get seconds left before starting raspberry
 			retval = rpi_get_restart_time_left();
@@ -231,7 +242,7 @@ void setup() {
 #if BB_DEBUG
 	pinMode(DBG_PIN, OUTPUT);
 	digitalWrite(DBG_PIN, 0);
-	rpi_set_manual_enabled(true);
+	rpi_set_manual(true);
 #endif
 
 	rpi_setup();
@@ -269,9 +280,12 @@ ISR(TIMER1_COMPA_vect) {
 #if DEBUG
 	dbg_timer();
 #endif
+	if (error_status) {
+		return;  // Disable timers if an error happend
+	}
 
 	if (rpi_is_manual()) {
-		return;
+		return;  // Disable timers if in manual mode
 	}
 	rpi_timers_update();
 }
