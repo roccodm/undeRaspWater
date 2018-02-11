@@ -78,6 +78,15 @@ double user_interface(char *cmd_string) {
 			rpi_set_manual_enabled(false);
 			retval = 0;
 			break;
+		case 'R':
+			if (!rpi_is_manual()) {
+				sprintf(buffer, "Not in manual mode");
+				retval = -2;
+			} else {
+				rpi_setup();  // Reset RPI status
+				retval = 1;
+			}
+			break;
 		case 'r':  // get RPI running status
 			retval = rpi_get_status();
 			break;
@@ -220,7 +229,7 @@ void setup() {
 #if BB_DEBUG
 	pinMode(DBG_PIN, OUTPUT);
 	digitalWrite(DBG_PIN, 0);
-	delay(5000);  // wait first serial command?
+	rpi_set_manual_enabled(true);
 #endif
 
 	rpi_setup();

@@ -10,21 +10,31 @@ bool rpi_first = true;    // true when first start, used to run self-checks
 bool rpi_manual = false;  // set true to prevent RPI shutdown
 
 // RPI status (could use bitfield)
-bool rpi_started = false;    // If the RPI was started
-bool rpi_heartbeat = false;  // If the RPI is alive
+bool rpi_started = false;    // If RPI was started
+bool rpi_heartbeat = false;  // If RPI is alive
 bool rpi_halting = false;    // If RPI requested shutdown
 bool rpi_was_alive = false;  // If RPI sent the first heartbeat
 
 // Cooldowns
-int rpi_cooldown = 0;  // The cooldown used for start/stop operations
-int rpi_heartbeat_cooldown =
-    0;  // The cooldown used to reset the heartbeat status
+int rpi_cooldown = 0;		 // Cooldown used for start/stop operations
+int rpi_heartbeat_cooldown = 0;  // Cooldown used to reset the heartbeat status
 
 // Restarting
 int rpi_restart_delay = 0;  // The delay after which restart the RPI
 int rpi_restart_timer = 0;  // The timer to accumulate restart delay
 
 void rpi_setup() {
+	// Reset all variables (except manual mode)
+	rpi_first = true;
+	rpi_started = false;
+	rpi_heartbeat = false;
+	rpi_halting = false;
+	rpi_was_alive = false;
+	rpi_cooldown = 0;
+	rpi_heartbeat_cooldown = 0;
+	rpi_restart_delay = 0;
+	rpi_restart_timer = 0;
+
 	// Check initial RPI status
 	rpi_started = rpi_has_power();
 }
@@ -109,7 +119,6 @@ void rpi_handle_ops() {
 		// RPI asked to shutdown
 		if (rpi_cooldown >= RPI_STOP_COOLDOWN) {
 			// It's time to shut it down as requested. All good.
-			rpi_first = false;
 			rpi_stop();
 		}
 		// All good.
@@ -171,6 +180,7 @@ void rpi_stop() {
 	digitalWrite(RELAY_RESET_PIN, 1);
 	delay(100);
 	digitalWrite(RELAY_RESET_PIN, 0);
+	rpi_first = false;
 	rpi_started = false;
 	rpi_cooldown = 0;
 }
