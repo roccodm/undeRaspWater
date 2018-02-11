@@ -1,5 +1,14 @@
 #define DEBUG 1
 
+#if DEBUG
+#define BB_DEBUG 1
+
+#if BB_DEBUG
+#define DBG_PIN 2
+#endif
+
+#endif
+
 // Messages
 #define START_MSG "\n\nUnderRaspino Ready."
 #define I2C_INIT_FAIL "FATAL: i2c bus error"

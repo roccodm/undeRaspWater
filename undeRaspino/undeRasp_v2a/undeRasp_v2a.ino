@@ -114,6 +114,14 @@ double user_interface(char *cmd_string) {
 		case 'z':  // get seconds left before starting raspberry
 			retval = rpi_get_restart_time_left();
 			break;
+#if BB_DEBUG
+		case '>':
+			digitalWrite(DBG_PIN, 1);
+			break;
+		case '<':
+			digitalWrite(DBG_PIN, 0);
+			break;
+#endif
 		default:
 			break;  // unknown command
 	}
@@ -217,11 +225,17 @@ void setup() {
 		digitalWrite(OK_LED_PIN, 0);  // Turn off led
 	}
 
-	// Check initial RPI status
-	rpi_started = rpi_has_power();
-
 	// Print help menu
 	print_menu();
+
+#if BB_DEBUG
+	pinMode(DBG_PIN, OUTPUT);
+	digitalWrite(DBG_PIN, 0);
+	delay(5000); // wait first serial command?
+#endif
+
+	// Check initial RPI status
+	rpi_started = rpi_has_power();
 
 	cli();  // stop interrupts
 

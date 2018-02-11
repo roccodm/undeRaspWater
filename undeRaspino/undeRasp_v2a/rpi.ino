@@ -86,6 +86,9 @@ void rpi_handle_ops() {
 void rpi_start() {
 #if DEBUG
 	Serial.println("Starting raspberry");
+#if BB_DEBUG
+	digitalWrite(DBG_PIN, 1);
+#endif
 #endif
 	digitalWrite(RELAY_SET_PIN, 1);
 	delay(100);
@@ -98,6 +101,9 @@ void rpi_stop() {
 	if (rpi_keepalive) return;
 #if DEBUG
 	Serial.println("Stopping raspberry");
+#if BB_DEBUG
+	digitalWrite(DBG_PIN, 0);
+#endif
 #endif
 	digitalWrite(RELAY_RESET_PIN, 1);
 	delay(100);
