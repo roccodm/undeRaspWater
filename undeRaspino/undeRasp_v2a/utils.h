@@ -22,8 +22,8 @@ double get_temperature();
 double get_eeprom_date();
 double set_eeprom_date(char *buf);
 DateTime get_rtc_datetime();
-double set_rtc_time_s(char *in, char *err);
-double get_rtc_time_s(char *err);
+double set_rtc_datetime_s(char *in, char *err);
+double get_rtc_datetime_s(char *err);
 
 bool error_status = false; // flag is set in case of fatal errors
 RTC_DS1307 RTC;

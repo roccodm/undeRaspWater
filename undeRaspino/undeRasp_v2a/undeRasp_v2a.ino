@@ -10,10 +10,10 @@
 char buffer[BUFFSIZE];  // general purpose global buffer
 double i2c_val;		// return value for i2c operations
 
-double user_interface(char *cmd_string) {
+double user_interface(char *cmd_s) {
 	int i;
 	int dpow;
-	char cmd = cmd_string[0];
+	char cmd = cmd_s[0];
 	double retval = -1;
 	switch (cmd) {
 		case '?':  // print menu
@@ -27,7 +27,7 @@ double user_interface(char *cmd_string) {
 			retval = get_temperature();
 			break;
 		case 'D':  // set eeprom date
-			retval = set_eeprom_datetime(cmd_string, buffer);
+			retval = set_eeprom_datetime(&cmd_s[1], buffer);
 			rpi_update_waketime();
 			break;
 		case 'd':  // read eeprom date and wake delay
@@ -64,8 +64,8 @@ double user_interface(char *cmd_string) {
 			retval = 0;
 			break;
 		case 'M':  // set operation mode
-			if (strlen(cmd_string) < 2) break;
-			retval = rpi_set_run_mode_s(&cmd_string[1], buffer);
+			if (strlen(cmd_s) < 2) break;
+			retval = rpi_set_run_mode_s(&cmd_s[1], buffer);
 			break;
 		case 'm':  // get operation mode
 			retval = rpi_get_run_mode();
@@ -100,7 +100,7 @@ double user_interface(char *cmd_string) {
 			break;
 		case 'T':  // set RTC datetime
 			if (!rpi_has_power()) {
-				retval = set_rtc_time_s(cmd_string, buffer);
+				retval = set_rtc_datetime_s(&cmd_s[1], buffer);
 			} else {
 				sprintf(buffer, "RPI is running");
 				retval = -2;
@@ -108,7 +108,7 @@ double user_interface(char *cmd_string) {
 			break;
 		case 't':  // get RTC datime
 			if (!rpi_has_power()) {
-				retval = get_rtc_time_s(buffer);
+				retval = get_rtc_datetime_s(buffer);
 			} else {
 				sprintf(buffer, "RPI is running");
 				retval = -2;
@@ -126,9 +126,11 @@ double user_interface(char *cmd_string) {
 #if BB_DEBUG
 		case '>':
 			digitalWrite(DBG_PIN, 1);
+			retval = 1;
 			break;
 		case '<':
 			digitalWrite(DBG_PIN, 0);
+			retval = 0;
 			break;
 #endif
 		default:

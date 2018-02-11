@@ -37,6 +37,7 @@ void rpi_setup() {
 
 	// Check initial RPI status
 	rpi_started = rpi_has_power();
+	rpi_update_waketime();
 }
 
 /*

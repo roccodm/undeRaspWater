@@ -62,12 +62,12 @@ void print_menu() {
 DateTime get_rtc_time() { return RTC.now(); }
 
 /*
- * Function set_rct_time_s(string, err)
+ * Function set_rct_datetime_s(string, err)
  * sets the rtc datetime to given value
  * string format: YYMMDDHHMMSS
  */
 
-double set_rtc_time_s(char *in, char* err) {
+double set_rtc_datetime_s(char *in, char* err) {
 	char data[20];
 	if (strlen(in) != 12) {
 		if (err) sprintf(err, "too short");
@@ -84,9 +84,9 @@ double set_rtc_time_s(char *in, char* err) {
 	return 1;
 }
 
-double get_rtc_time_s(char *out) {
+double get_rtc_datetime_s(char *out) {
 	DateTime now = RTC.now();
-	sprintf(buffer, "%02d/%02d/%04d %02d.%02d.%02d",
+	sprintf(out, "%02d/%02d/%04d %02d.%02d.%02d",
 		now.day(), now.month(), now.year(),
 		now.hour(), now.minute(), now.second());
 	return -2;
