@@ -3,6 +3,32 @@
 #include "rpi.h"
 #include "utils.h"
 
+//
+// RPI global vars, should not get exposed.
+//
+bool rpi_first = true;    // true when first start, used to run self-checks
+bool rpi_manual = false;  // set true to prevent RPI shutdown
+
+// RPI status (could use bitfield)
+bool rpi_started = false;    // If the RPI was started
+bool rpi_heartbeat = false;  // If the RPI is alive
+bool rpi_halting = false;    // If RPI requested shutdown
+bool rpi_was_alive = false;  // If RPI sent the first heartbeat
+
+// Cooldowns
+int rpi_cooldown = 0;  // The cooldown used for start/stop operations
+int rpi_heartbeat_cooldown =
+    0;  // The cooldown used to reset the heartbeat status
+
+// Restarting
+int rpi_restart_delay = 0;  // The delay after which restart the RPI
+int rpi_restart_timer = 0;  // The timer to accumulate restart delay
+
+void rpi_setup() {
+	// Check initial RPI status
+	rpi_started = rpi_has_power();
+}
+
 /*
  * Function rpi_update_waketime()
  *
@@ -14,7 +40,7 @@ void rpi_update_waketime() {
 }
 
 int rpi_get_restart_time_left() {
-	if(rpi_started) return -1;
+	if (rpi_started) return -1;
 	return rpi_restart_delay - rpi_restart_timer;
 }
 
@@ -31,56 +57,92 @@ void rpi_set_serial_enabled(bool enabled) {
 uint8_t rpi_set_run_mode_s(char *in, char *out) {
 	int dpow = 1;
 	int val;
-	if (!atoi(in, &val, out) || val > 127)
-		return -1;
+	if (!atoi(in, &val, out) || val > 127) return -1;
 	EEPROM.write(EEPROM_MODE_LOCATION, val);
 	return val;
 };
 
 uint8_t rpi_get_run_mode() {
 	uint8_t ret = EEPROM.read(EEPROM_MODE_LOCATION);
-	if (rpi_is_first_start()) ret |= 0x80;
+	if (rpi_first) ret |= 0x80;
 	return ret;
 }
 
 void rpi_set_heartbeat(bool on) {
 	rpi_heartbeat = on;
 	rpi_heartbeat_cooldown = 0;
-	rpi_cooldown = RPI_START_COOLDOWN;
+	rpi_was_alive = true;
 }
 
 bool rpi_get_heartbeat() { return rpi_heartbeat; }
 
-void rpi_set_keepalive(bool on) { rpi_keepalive = on; }
+void rpi_set_manual_enabled(bool on) { rpi_manual = on; }
+bool rpi_is_manual() { return rpi_manual; }
 
 bool rpi_has_power() { return digitalRead(RASPBERRY_STATUS_PIN) == 1; }
 
-bool rpi_is_running() {
-	return rpi_has_power() &&
-	       (rpi_cooldown < RPI_START_COOLDOWN || rpi_get_heartbeat());
-}
-
-bool rpi_is_first_start() { return first_start; }
-
-void rpi_handle_checks() {
-	// first run, rpi will do self test and shutdown
-	if (!rpi_started) {
-		rpi_start();
-	} else if (!rpi_is_running()) {
-		if (rpi_keepalive) return;
-		// rpi shutdown?! enter normal operation mode
-		first_start = false;
-		rpi_stop();
-	}
+bool rpi_get_status() {
+	int status = 0;
+	if (rpi_has_power()) status += 1;
+	if (rpi_was_alive) status += 2;
+	if (rpi_heartbeat) status += 4;
+	if (rpi_halting) status += 8;
+	return status;
 }
 
 void rpi_handle_ops() {
-	// start RPI if rpi_restart_timer has passed
-	if (!rpi_is_running() && rpi_restart_delay > 0 &&
-	    rpi_restart_timer >= rpi_restart_delay) {
-		rpi_restart_timer = 0;
-		rpi_start();
+	// Check if the RPI was started
+	if (!rpi_started) {
+		if (rpi_first) {
+			// On first run, immediately start
+			rpi_start();
+		} else if (rpi_restart_timer >= rpi_restart_delay) {
+			// It's time to start the RPI.
+			rpi_restart_timer = 0;
+			rpi_start();
+		}
+		// All good.
+		return;
 	}
+
+	if (rpi_halting) {
+		// RPI asked to shutdown
+		if (rpi_cooldown >= RPI_STOP_COOLDOWN) {
+			// It's time to shut it down as requested. All good.
+			rpi_first = false;
+			rpi_stop();
+		}
+		// All good.
+		return;
+	}
+
+	if (rpi_get_heartbeat()) {
+		// RPI was started, is not halting, and looks alive. All good.
+		return;
+	}
+
+	if (!rpi_has_power() && rpi_cooldown > 0) {
+		// RPI was started, did not request a shutdown, but looks dead,
+		// and is unpowered. Setting error.
+		set_error(RPI_ERR_UNPOWERED, "RPI is unpowered.");
+		return;
+	}
+
+	if (rpi_was_alive) {
+		// RPI was started, did not request shutdown, is powered, and
+		// booted properly but looks dead. Setting error.
+		set_error(RPI_ERR_UNRESPONSIVE, "RPI is unresponsive.");
+		return;
+	}
+
+	if (rpi_cooldown >= RPI_START_COOLDOWN) {
+		// RPI was started, did not request shutdown, is powered, looks
+		// dead, and the boot timer has expired. Setting error.
+		set_error(RPI_ERR_BOOT_FAILED, "RPI failed to boot");
+		return;
+	}
+
+	// If we made it this far, it means it's all going according to plan.
 }
 
 void rpi_start() {
@@ -93,12 +155,13 @@ void rpi_start() {
 	digitalWrite(RELAY_SET_PIN, 1);
 	delay(100);
 	digitalWrite(RELAY_SET_PIN, 0);
-	rpi_started = true;
-	rpi_cooldown = 0;
+	rpi_started = true;     // If the RPI was started
+	rpi_halting = false;    // If RPI requested shutdown
+	rpi_was_alive = false;  // If RPI sent the first heartbeat
+	rpi_cooldown = 0;       // The cooldown used for start/stop operations
 }
 
 void rpi_stop() {
-	if (rpi_keepalive) return;
 #if DEBUG
 	Serial.println("Stopping raspberry");
 #if BB_DEBUG
@@ -112,26 +175,33 @@ void rpi_stop() {
 	rpi_cooldown = 0;
 }
 
-void rpi_cooldown_update() {
-	// rpi start/stop cooldown
-	if (rpi_started && rpi_cooldown < RPI_START_COOLDOWN) {
-		rpi_cooldown += 1;
-	} else if (!rpi_started && rpi_cooldown < RPI_STOP_COOLDOWN) {
-		rpi_cooldown += 1;
+inline void _handle_heartbeat() {
+	rpi_heartbeat_cooldown += 1;
+	if (rpi_heartbeat_cooldown >= RPI_HEARTBEAT_RESET_TIME) {
+		rpi_heartbeat_cooldown -= RPI_HEARTBEAT_RESET_TIME;
+		rpi_heartbeat = false;
 	}
+}
 
-	// heartbeat reset function
-	if (rpi_get_heartbeat()) {
-		rpi_heartbeat_cooldown += 1;
-		if (rpi_heartbeat_cooldown >= RPI_HEARTBEAT_RESET_TIME) {
-			rpi_heartbeat_cooldown -= RPI_HEARTBEAT_RESET_TIME;
-			rpi_heartbeat = false;
+void rpi_timers_update() {
+	if (rpi_started) {
+		if (rpi_halting && rpi_cooldown < RPI_STOP_COOLDOWN) {
+			// RPI requested shutdown
+			rpi_cooldown += 1;
+		} else if (!rpi_was_alive &&
+			   rpi_cooldown < RPI_START_COOLDOWN) {
+			// RPI starting
+			rpi_cooldown += 1;
 		}
-	}
 
-	// restart timer.
-	// after a shutdown will restart RPI after rpi_restart_delay
-	if (!rpi_started && rpi_restart_delay > 0) {
-		rpi_restart_timer += 1;
+		// heartbeat reset function
+		if (rpi_get_heartbeat()) {
+			_handle_heartbeat();
+		}
+	} else {
+		// will restart RPI after rpi_restart_delay
+		if (rpi_restart_timer < rpi_restart_delay) {
+			rpi_restart_timer += 1;
+		}
 	}
 }

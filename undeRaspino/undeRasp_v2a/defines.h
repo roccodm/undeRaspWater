@@ -26,6 +26,10 @@
 #define RASP_FAIL_ERRCODE 84
 #define RASP_NO_HB_ERRCODE 85
 
+#define RPI_ERR_UNPOWERED 91 // RPI was powered on, but looks unpowered
+#define RPI_ERR_BOOT_FAILED 92 // RPI has power, but looks unable to boot
+#define RPI_ERR_UNRESPONSIVE 93 // RPI booted, but seems unresponsive now
+
 // CONFIG
 #define VCC 3.3
 #define MOSFET_PIN 4

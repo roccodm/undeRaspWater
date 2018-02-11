@@ -70,16 +70,16 @@ double user_interface(char *cmd_string) {
 		case 'm':  // get operation mode
 			retval = rpi_get_run_mode();
 			break;
-		case 'O':  // set RPI keepalive
-			rpi_set_keepalive(true);
+		case 'O':  // set RPI manual mode
+			rpi_set_manual_enabled(true);
 			retval = 1;
 			break;
-		case 'o':  // unset RPI keepalive
-			rpi_set_keepalive(false);
+		case 'o':  // unset RPI manual mode
+			rpi_set_manual_enabled(false);
 			retval = 0;
 			break;
 		case 'r':  // get RPI running status
-			retval = rpi_is_running();
+			retval = rpi_get_status();
 			break;
 		case 'S':  // start RPI
 			rpi_start();
@@ -90,7 +90,7 @@ double user_interface(char *cmd_string) {
 			retval = 0;
 			break;
 		case 'T':  // set RTC datetime
-			if (!rpi_is_running()) {
+			if (!rpi_has_power()) {
 				retval = set_rtc_time_s(cmd_string, buffer);
 			} else {
 				sprintf(buffer, "RPI is running");
@@ -98,7 +98,7 @@ double user_interface(char *cmd_string) {
 			}
 			break;
 		case 't':  // get RTC datime
-			if (!rpi_is_running()) {
+			if (!rpi_has_power()) {
 				retval = get_rtc_time_s(buffer);
 			} else {
 				sprintf(buffer, "RPI is running");
@@ -170,17 +170,6 @@ void i2c_receive(int count) {
 
 void i2c_send() { Wire.write(buffer); }
 
-void loop() {
-	if (error_status) {
-		return;  // Disable loop if an error happend
-	}
-	if (rpi_is_first_start()) {
-		rpi_handle_checks();
-	} else {
-		rpi_handle_ops();
-	}
-}
-
 void setup() {
 	// Pin setup
 	pinMode(SERIAL_ARDUINO_PIN, OUTPUT);
@@ -231,11 +220,10 @@ void setup() {
 #if BB_DEBUG
 	pinMode(DBG_PIN, OUTPUT);
 	digitalWrite(DBG_PIN, 0);
-	delay(5000); // wait first serial command?
+	delay(5000);  // wait first serial command?
 #endif
 
-	// Check initial RPI status
-	rpi_started = rpi_has_power();
+	rpi_setup();
 
 	cli();  // stop interrupts
 
@@ -268,8 +256,24 @@ void dbg_timer() {
 // Timer1 interrupt
 ISR(TIMER1_COMPA_vect) {
 #if DEBUG
-	dbg_timer();  // used for serial debug, disable when going live
+	dbg_timer();
 #endif
 
-	rpi_cooldown_update();
+	if (rpi_is_manual()) {
+		return;
+	}
+	rpi_timers_update();
+}
+
+// Main loop
+void loop() {
+	if (error_status) {
+		return;  // Disable loop if an error happend
+	}
+
+	if (rpi_is_manual()) {
+		return;  // Disable loop when in manual mode
+	}
+
+	rpi_handle_ops();
 }
