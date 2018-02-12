@@ -7,8 +7,13 @@
 #include "utils.h"
 
 // GLOBAL VARS
-char buffer[BUFFSIZE];  // general purpose global buffer
-double i2c_val;		// return value for i2c operations
+char serial_buf[BUFFSIZE];  // serial buffer
+short serial_pos = -1;      // serial position (incremented at the beginning)
+
+char i2c_buf[BUFFSIZE];  // i2c buffer
+char i2c_out_buf[7];     // i2c output buffer
+
+char out_buf[BUFFSIZE];  // output buffer
 
 double user_interface(char *cmd_s) {
 	int i;
@@ -27,11 +32,11 @@ double user_interface(char *cmd_s) {
 			retval = get_temperature();
 			break;
 		case 'D':  // set eeprom date
-			retval = set_eeprom_datetime(&cmd_s[1], buffer);
+			retval = set_eeprom_datetime(&cmd_s[1], out_buf);
 			rpi_update_waketime();
 			break;
 		case 'd':  // read eeprom date and wake delay
-			retval = get_eeprom_datetime(buffer);
+			retval = get_eeprom_datetime(out_buf);
 			break;
 		case 'E':  // clear last error
 			reset_error();
@@ -65,7 +70,7 @@ double user_interface(char *cmd_s) {
 			break;
 		case 'M':  // set operation mode
 			if (strlen(cmd_s) < 2) break;
-			retval = rpi_set_run_mode_s(&cmd_s[1], buffer);
+			retval = rpi_set_run_mode_s(&cmd_s[1], out_buf);
 			break;
 		case 'm':  // get operation mode
 			retval = rpi_get_run_mode();
@@ -88,7 +93,7 @@ double user_interface(char *cmd_s) {
 			break;
 		case 'R':
 			if (!rpi_is_manual()) {
-				sprintf(buffer, "Not in manual mode");
+				sprintf(out_buf, "Not in manual mode");
 				retval = -2;
 			} else {
 				rpi_setup();  // Reset RPI status
@@ -108,17 +113,17 @@ double user_interface(char *cmd_s) {
 			break;
 		case 'T':  // set RTC datetime
 			if (!rpi_has_power()) {
-				retval = set_rtc_datetime_s(&cmd_s[1], buffer);
+				retval = set_rtc_datetime_s(&cmd_s[1], out_buf);
 			} else {
-				sprintf(buffer, "RPI is running");
+				sprintf(out_buf, "RPI is running");
 				retval = -2;
 			}
 			break;
 		case 't':  // get RTC datime
 			if (!rpi_has_power()) {
-				retval = get_rtc_datetime_s(buffer);
+				retval = get_rtc_datetime_s(out_buf);
 			} else {
-				sprintf(buffer, "RPI is running");
+				sprintf(out_buf, "RPI is running");
 				retval = -2;
 			}
 			break;
@@ -152,28 +157,41 @@ double user_interface(char *cmd_s) {
 
 /*
  * Function serialEvent()
- * Is called in case of serialEvent
+ * Called when new data is available on the serial
  * 1) assembles the command string
  * 2) calls the user_interface function
- * input is trunked at BUFF_SIZE max lenght
+ * input is truncated at BUFF_SIZE length
  */
 
 void serialEvent() {
 	char data = 0;
-	int i = 0;
 	double retval;
-	delay(50);  // FIXME ugly hack
 	while (Serial.available()) {
 		data = Serial.read();
-		if (i < BUFFSIZE - 1) buffer[i++] = data;
+		serial_pos += 1;
+		if (serial_pos >= BUFFSIZE) {
+			// message too long, wrapping!
+			serial_pos = 0;
+		}
+		serial_buf[serial_pos] = data;
+		if (serial_buf[serial_pos] == '\n') {
+			serial_buf[serial_pos] = '\0';
+			break;
+		}
 	}
-	buffer[i] = '\0';
+	if (serial_buf[serial_pos] != '\0') {
+		return;  // message is not over yet
+	}
+	serial_pos = -1;
+	while (Serial.available()) {
+		Serial.read();  // trash what's left
+	}
 	Serial.print("CMD ");
-	Serial.print(buffer);
+	Serial.print(serial_buf);
 	Serial.print(":");
-	retval = user_interface(buffer);
+	retval = user_interface(serial_buf);
 	if (retval == -2)
-		Serial.println(buffer);
+		Serial.println(out_buf);
 	else
 		Serial.println(retval);
 }
@@ -181,16 +199,17 @@ void serialEvent() {
 void i2c_receive(int count) {
 	char data = 0;
 	int i = 0;
+	double retval;
 	while (Wire.available()) {
 		data = Wire.read();
-		if (i < BUFFSIZE - 1) buffer[i++] = data;
+		if (i < BUFFSIZE - 1) i2c_buf[i++] = data;
 	}
-	buffer[i] = '\0';
-	i2c_val = user_interface(buffer);
-	if (i2c_val != -2) dtostrf(i2c_val, 6, 3, buffer);
+	i2c_buf[i] = '\0';
+	retval = user_interface(i2c_buf);
+	if (retval != -2) dtostrf(retval, 6, 3, i2c_out_buf);
 }
 
-void i2c_send() { Wire.write(buffer); }
+void i2c_send() { Wire.write(i2c_out_buf); }
 
 void setup() {
 	// Pin setup
