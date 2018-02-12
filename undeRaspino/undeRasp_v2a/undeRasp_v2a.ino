@@ -52,14 +52,6 @@ double user_interface(char *cmd_s) {
 		case 'h':  // get RPI heartbeat
 			retval = rpi_get_heartbeat();
 			break;
-		case 'K':  // enable RPI/disable arduino serial output
-			rpi_set_serial(true);
-			retval = 1;
-			break;
-		case 'k':  // disable RPI/enable arduino serial output
-			rpi_set_serial(false);
-			retval = 1;
-			break;
 		case 'L':  // turn on mosfet
 			set_mosfet(true);
 			retval = 1;
@@ -82,6 +74,14 @@ double user_interface(char *cmd_s) {
 		case 'o':  // unset RPI manual mode
 			rpi_set_manual(false);
 			retval = 0;
+			break;
+		case 'P':  // enable RPI/disable arduino serial output
+			rpi_set_serial(true);
+			retval = 1;
+			break;
+		case 'p':  // disable RPI/enable arduino serial output
+			rpi_set_serial(false);
+			retval = 1;
 			break;
 		case 'Q':
 			rpi_set_halting(true);
