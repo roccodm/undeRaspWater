@@ -17,7 +17,7 @@ bool atod(char *in, char *data, char *err) {
 	int i;
 	for (i = 0; i < strlen(in); i++) {
 		if (in[i] < 48 || in[i] > 57) {
-			if (err) sprintf(err, "invalid char");
+			if (err) sprintf(err, MSG_INVALID_INT);
 			return false;
 		}
 		data[i] = in[i] - 48;
@@ -41,25 +41,25 @@ void reset_error() {
 }
 
 void print_menu() {
-	Serial.println("?\tprint this menu");
-	Serial.println("a\tpower used(A)");
-	Serial.println("c\ttemperature(C)");
-	Serial.println("D/d\twrite/read EEPROM datetime and delay (YYMMDDHHMMTTT)");
-	Serial.println("E/e\tclear/read last error in EEPROM");
-	Serial.println("H/h\tset/read heartbeat");
-	Serial.println("P/p\tenable/disable RB serial out");
-	Serial.println("L/l\tenable/disable mosfet");
-	Serial.println("M/m\tset/read current RPI working mode");
-	Serial.println("O/o\tset/unset manual operations mode");
-	Serial.println("Q/q\tset/unset RPI shutdown request");
-	Serial.println("r\tget RPI running status");
-	Serial.println("S/s\tstart/stop RPI");
-	Serial.println("T/t\tset/read RTC datetime (YYMMDDHHMMSS)");
-	Serial.println("v\tread current voltage");
-	Serial.println("w\tread current watts");
-	Serial.println("z\tSeconds left before starting RPI");
+	Serial.println(PS("?\tprint this menu"));
+	Serial.println(PS("a\tpower used(A)"));
+	Serial.println(PS("c\ttemperature(C)"));
+	Serial.println(PS("D/d\twrite/read EEPROM datetime and delay (YYMMDDHHMMTTT)"));
+	Serial.println(PS("E/e\tclear/read last error in EEPROM"));
+	Serial.println(PS("H/h\tset/read heartbeat"));
+	Serial.println(PS("P/p\tenable/disable RB serial out"));
+	Serial.println(PS("L/l\tenable/disable mosfet"));
+	Serial.println(PS("M/m\tset/read current RPI working mode"));
+	Serial.println(PS("O/o\tset/unset manual operations mode"));
+	Serial.println(PS("Q/q\tset/unset RPI shutdown request"));
+	Serial.println(PS("r\tget RPI running status"));
+	Serial.println(PS("S/s\tstart/stop RPI"));
+	Serial.println(PS("T/t\tset/read RTC datetime (YYMMDDHHMMSS)"));
+	Serial.println(PS("v\tread current voltage"));
+	Serial.println(PS("w\tread current watts"));
+	Serial.println(PS("z\tSeconds left before starting RPI"));
 #if BB_DEBUG
-	Serial.println("</>\tSend low/high on breadbord debug pin (D2)");
+	Serial.println(PS("</>\tSend low/high on breadbord debug pin (D2)"));
 #endif
 }
 
@@ -74,7 +74,7 @@ DateTime get_rtc_time() { return RTC.now(); }
 double set_rtc_datetime_s(char *in, char* err) {
 	char data[20];
 	if (strlen(in) != 12) {
-		if (err) sprintf(err, "too short");
+		if (err) sprintf(err, MSG_TOO_SHORT);
 		return -2;
 	}
 	if (!atod(in, data, err)) return -2;  // error
@@ -119,7 +119,7 @@ double set_eeprom_datetime(char *in, char *out) {
 	char data[20];
 
 	if (strlen(in) != 13) {
-		if (out) sprintf(out, "too short");
+		if (out) sprintf(out, MSG_TOO_SHORT);
 		return -2;
 	}
 	if (!atod(in, data, out)) return -2;  // error
@@ -132,7 +132,7 @@ double set_eeprom_datetime(char *in, char *out) {
 	int timestep = *(data + 10) * 100 + *(data + 11) * 10 + *(data + 12);
 	if (year < 17 || month <= 0 || month > 12 || day <= 0 || day > 31 ||
 	    hour >= 24 || minute >= 60 || timestep <= 0 || timestep > 250) {
-		sprintf(out, "invalid int");
+		sprintf(out, MSG_INVALID_INT);
 		return -2;  // Problem in conversion
 	}
 	EEPROM.write(1, year);
@@ -141,7 +141,7 @@ double set_eeprom_datetime(char *in, char *out) {
 	EEPROM.write(4, hour);
 	EEPROM.write(5, minute);
 	EEPROM.write(6, timestep);
-	sprintf(out, "ok");
+	sprintf(out, MSG_OK);
 	return -2;
 }
 

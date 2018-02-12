@@ -1,3 +1,6 @@
+#ifndef DEFINES_H
+#define DEFINES_H
+
 #define DEBUG 1
 
 #if DEBUG
@@ -9,22 +12,31 @@
 
 #endif
 
+// Function to use program memory for strings
+#define PS(str) (strcpy_P(prog_buf, PSTR(str)), prog_buf)
+char prog_buf[100];
+
 // Messages
-#define START_MSG "\n\nUnderRaspino Ready."
-#define I2C_INIT_FAIL "FATAL: i2c bus error"
-#define RTC_INIT_FAIL "FATAL: RTC error"
-#define LOWBAT "Low battery to start RB"
-#define RASP_FAIL "Unable to powerup RB"
-#define RASP_NO_HB "Unable to receive Heartbeat from RB"
-#define RASP_STARTING "Starting RB"
-#define RASP_STOP "RB stopped"
+#define MSG_START PS("\n\nUnderRaspino Ready.")
+#define MSG_I2C_FAIL PS("FATAL: i2c bus error")
+#define MSG_RTC_FAIL PS("FATAL: RTC error")
+#define MSG_LOW_BATTERY PS("Low battery to start RB")
+
+#define MSG_TOO_SHORT PS("too short")
+#define MSG_INVALID_INT PS("invalid int")
+#define MSG_OK PS("ok")
+
+#define MSG_RPI_START PS("Starting Raspberry")
+#define MSG_RPI_STOP PS("Stopping Raspberry")
+
+#define MSG_RPI_NO_POWER PS("RPI is unpowered")
+#define MSG_RPI_NO_RESPONSE PS("RPI is unresponsive")
+#define MSG_RPI_NO_BOOT PS("RPI failed to boot")
 
 // ERR CODES
-#define I2C_ERRCODE 81
-#define RTC_ERRCODE 82
-#define LOWBAT_ERRCODE 83
-#define RASP_FAIL_ERRCODE 84
-#define RASP_NO_HB_ERRCODE 85
+#define ERR_I2C_FAIL 81
+#define ERR_RTC_FAIL 82
+#define ERR_LOWBATTERY 83
 
 #define RPI_ERR_UNPOWERED 91 // RPI was powered on, but looks unpowered
 #define RPI_ERR_BOOT_FAILED 92 // RPI has power, but looks unable to boot
@@ -53,3 +65,5 @@
 
 #define EEPROM_ERR_LOCATION 7
 #define EEPROM_MODE_LOCATION 8
+
+#endif

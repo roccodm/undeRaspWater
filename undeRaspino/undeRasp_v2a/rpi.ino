@@ -137,21 +137,21 @@ void rpi_handle_ops() {
 	if (!rpi_has_power() && rpi_cooldown > 0) {
 		// RPI was started, did not request a shutdown, but looks dead,
 		// and is unpowered. Setting error.
-		set_error(RPI_ERR_UNPOWERED, "RPI is unpowered.");
+		set_error(RPI_ERR_UNPOWERED, MSG_RPI_NO_POWER);
 		return;
 	}
 
 	if (rpi_booted) {
 		// RPI was started, did not request shutdown, is powered, and
 		// booted properly but looks dead. Setting error.
-		set_error(RPI_ERR_UNRESPONSIVE, "RPI is unresponsive.");
+		set_error(RPI_ERR_UNRESPONSIVE, MSG_RPI_NO_RESPONSE);
 		return;
 	}
 
 	if (rpi_cooldown >= RPI_START_COOLDOWN) {
 		// RPI was started, did not request shutdown, is powered, looks
 		// dead, and the boot timer has expired. Setting error.
-		set_error(RPI_ERR_BOOT_FAILED, "RPI failed to boot");
+		set_error(RPI_ERR_BOOT_FAILED, MSG_RPI_NO_BOOT);
 		return;
 	}
 
@@ -160,7 +160,7 @@ void rpi_handle_ops() {
 
 void rpi_start() {
 #if DEBUG
-	Serial.println("Starting raspberry");
+	Serial.println(MSG_RPI_START);
 #if BB_DEBUG
 	digitalWrite(DBG_PIN, 1);
 #endif
@@ -176,7 +176,7 @@ void rpi_start() {
 
 void rpi_stop() {
 #if DEBUG
-	Serial.println("Stopping raspberry");
+	Serial.println(MSG_RPI_STOP);
 #if BB_DEBUG
 	digitalWrite(DBG_PIN, 0);
 #endif

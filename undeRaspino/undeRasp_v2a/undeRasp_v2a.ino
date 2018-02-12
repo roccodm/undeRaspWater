@@ -93,7 +93,7 @@ double user_interface(char *cmd_s) {
 			break;
 		case 'R':
 			if (!rpi_is_manual()) {
-				sprintf(out_buf, "Not in manual mode");
+				sprintf(out_buf, PS("Not in manual mode"));
 				retval = -2;
 			} else {
 				rpi_setup();  // Reset RPI status
@@ -115,7 +115,7 @@ double user_interface(char *cmd_s) {
 			if (!rpi_has_power()) {
 				retval = set_rtc_datetime_s(&cmd_s[1], out_buf);
 			} else {
-				sprintf(out_buf, "RPI is running");
+				sprintf(out_buf, PS("RPI is running"));
 				retval = -2;
 			}
 			break;
@@ -123,7 +123,7 @@ double user_interface(char *cmd_s) {
 			if (!rpi_has_power()) {
 				retval = get_rtc_datetime_s(out_buf);
 			} else {
-				sprintf(out_buf, "RPI is running");
+				sprintf(out_buf, PS("RPI is running"));
 				retval = -2;
 			}
 			break;
@@ -234,11 +234,11 @@ void setup() {
 	Wire.begin(I2C_ADDRESS);  // Start I2C
 	RTC.begin();		  // Start the RTC clock
 	if (analogRead(I2C_SDA) < 900 || analogRead(I2C_SCL) < 900) {
-		set_error(I2C_ERRCODE, I2C_INIT_FAIL);
+		set_error(ERR_I2C_FAIL, MSG_I2C_FAIL);
 	} else {
 		// Check RTC is working
 		if (!RTC.isrunning()) {
-			set_error(RTC_ERRCODE, RTC_INIT_FAIL);
+			set_error(ERR_RTC_FAIL, MSG_RTC_FAIL);
 		}
 	}
 
@@ -248,7 +248,7 @@ void setup() {
 
 	// Finally
 	if (!error_status) {
-		Serial.println(START_MSG);
+		Serial.println(MSG_START);
 		digitalWrite(FAIL_LED_PIN, 0);
 		digitalWrite(OK_LED_PIN, 1);  // Turn on green led
 		delay(2000);
