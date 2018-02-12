@@ -47,16 +47,20 @@ void print_menu() {
 	Serial.println("D/d\twrite/read EEPROM datetime and delay (YYMMDDHHMMTTT)");
 	Serial.println("E/e\tclear/read last error in EEPROM");
 	Serial.println("H/h\tset/read heartbeat");
-	Serial.println("K/k\tenable/disable RB serial out");
+	Serial.println("P/p\tenable/disable RB serial out");
 	Serial.println("L/l\tenable/disable mosfet");
 	Serial.println("M/m\tset/read current RPI working mode");
-	Serial.println("O/o\tset/read keep on RB");
+	Serial.println("O/o\tset/unset manual operations mode");
+	Serial.println("Q/q\tset/unset RPI shutdown request");
 	Serial.println("r\tget RPI running status");
 	Serial.println("S/s\tstart/stop RPI");
 	Serial.println("T/t\tset/read RTC datetime (YYMMDDHHMMSS)");
 	Serial.println("v\tread current voltage");
 	Serial.println("w\tread current watts");
 	Serial.println("z\tSeconds left before starting RPI");
+#if BB_DEBUG
+	Serial.println("</>\tSend low/high on breadbord debug pin (D2)");
+#endif
 }
 
 DateTime get_rtc_time() { return RTC.now(); }
