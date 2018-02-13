@@ -10,8 +10,8 @@
 char serial_buf[BUFFSIZE]; // serial buffer
 short serial_pos = -1;     // serial position (incremented at the beginning)
 
-char i2c_buf[BUFFSIZE]; // i2c buffer
-char i2c_out_buf[7];    // i2c output buffer
+char i2c_buf[BUFFSIZE];     // i2c buffer
+char i2c_out_buf[BUFFSIZE]; // i2c output buffer
 
 char out_buf[BUFFSIZE]; // output buffer
 
@@ -314,8 +314,19 @@ ISR(TIMER1_COMPA_vect) {
 
 // Main loop
 void loop() {
+#if BB_DEBUG
+#else
+   if (get_voltage() <= VOLTAGE_CRITICAL) {
+      if (get_last_error() != ERR_VOLTAGE_CRITICAL) {
+         rpi_stop();
+         set_mosfet(false);
+         set_error(ERR_VOLTAGE_CRITICAL, MSG_VOLTAGE_CRITICAL);
+      }
+   }
+#endif
+
    if (error_status) {
-      return; // Disable loop if an error happend
+      return; // Disable loop if an error happened
    }
 
    if (rpi_is_manual()) {

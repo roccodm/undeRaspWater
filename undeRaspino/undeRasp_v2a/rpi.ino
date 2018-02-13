@@ -167,6 +167,13 @@ void rpi_handle_ops() {
 }
 
 void rpi_start() {
+#if BB_DEBUG
+#else
+   if (get_voltage() <= VOLTAGE_LOW) {
+      set_error(ERR_VOLTAGE_LOW, MSG_VOLTAGE_LOW);
+      return;
+   }
+#endif
 #if DEBUG
    Serial.println(MSG_RPI_START);
 #if BB_DEBUG
@@ -203,7 +210,7 @@ void rpi_timers_update() {
          // Heartbeat reset
          rpi_cooldown += 1;
          if (rpi_cooldown >= RPI_HEARTBEAT_RESET_TIME) {
-            rpi_cooldown -= RPI_HEARTBEAT_RESET_TIME;
+            rpi_cooldown = 0;
             rpi_heartbeat = false;
          }
       } else if (rpi_halting && rpi_cooldown < RPI_STOP_COOLDOWN) {
