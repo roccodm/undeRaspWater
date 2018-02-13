@@ -20,6 +20,8 @@ bool rpi_has_power();
 void rpi_set_halting(bool enabled);
 void rpi_set_heartbeat(bool on);
 bool rpi_get_heartbeat();
+int rpi_set_checks_result(char *in, char *err);
+int rpi_get_checks_result();
 
 // Operations
 void rpi_handle_ops();

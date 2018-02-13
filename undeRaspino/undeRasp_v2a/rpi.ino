@@ -15,6 +15,7 @@ bool rpi_heartbeat = false; // If RPI is alive
 bool rpi_halting = false;   // If RPI requested shutdown
 bool rpi_booted = false;    // If RPI sent the first heartbeat
 int rpi_cooldown = 0;       // Cooldown used for start/stop operations
+int rpi_checks_result = 0;  // Result from RPI checks on first start
 
 // Restarting
 int rpi_restart_delay = 0; // The delay after which restart the RPI
@@ -111,6 +112,21 @@ bool rpi_get_status() {
       status += 8;
    return status;
 }
+
+int rpi_set_checks_result(char *in, char *err) {
+   rpi_checks_result = 0;
+   if (strlen(in) < 1)
+      return 0;
+   if (!atoi(in, &rpi_checks_result, err)) {
+      rpi_checks_result = 1;
+      return -2;
+   }
+   return rpi_checks_result;
+}
+
+int rpi_get_checks_result() { return rpi_checks_result; }
+
+int rpi_get_checks_result();
 
 void rpi_handle_ops() {
    // Check if the RPI was started

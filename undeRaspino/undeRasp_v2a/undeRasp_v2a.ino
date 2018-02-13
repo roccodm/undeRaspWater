@@ -139,6 +139,12 @@ double user_interface(char *cmd_s) {
    case 'x': // get cooldown timer value
       retval = rpi_get_cooldown();
       break;
+   case 'Y':
+      retval = rpi_set_checks_result(&cmd_s[1], out_buf);
+      break;
+   case 'y':
+      retval = rpi_get_checks_result();
+      break;
    case 'z': // get seconds left before starting raspberry
       retval = rpi_get_restart_time_left();
       break;

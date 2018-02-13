@@ -3,11 +3,11 @@
 bool atoi(char *in, int *out, char *err) {
    int i;
    int dpow = 1;
-   out = 0;
-   for (i = strlen(in) - 1; i > 0; i--) {
+   *out = 0;
+   for (i = strlen(in) - 1; i >= 0; i--) {
       if (in[i] < 48 or in[i] > 57)
          return false;
-      out += (in[i] - 48) * dpow;
+      (*out) += (in[i] - 48) * dpow;
       dpow *= 10;
    }
    return true;
