@@ -67,6 +67,17 @@ void print_menu() {
 
 DateTime get_rtc_time() { return RTC.now(); }
 
+bool sync_time() {
+   uint32_t rtc_time = RTC.now().unixtime();
+   if (rtc_time < RTC_MIN_DATE)
+      return false;
+
+   curr_time = rtc_time;
+   return true;
+}
+
+uint32_t get_time() { return curr_time; }
+
 /*
  * Function set_rct_datetime_s(string, err)
  * sets the rtc datetime to given value
@@ -89,11 +100,39 @@ double set_rtc_datetime_s(char *in, char *err) {
    int minute = *(data + 8) * 10 + *(data + 9);
    int second = *(data + 10) * 10 + *(data + 11);
    RTC.adjust(DateTime(year + 2000, month, day, hour, minute, second));
+   sync_time();
+   return 1;
+}
+
+double set_internal_datetime_s(char *in, char *err) {
+   char data[20];
+   if (strlen(in) != 12) {
+      if (err)
+         sprintf(err, MSG_TOO_SHORT);
+      return -2;
+   }
+   if (!atod(in, data, err))
+      return -2; // error
+   int year = *data * 10 + *(data + 1);
+   int month = *(data + 2) * 10 + *(data + 3);
+   int day = *(data + 4) * 10 + *(data + 5);
+   int hour = *(data + 6) * 10 + *(data + 7);
+   int minute = *(data + 8) * 10 + *(data + 9);
+   int second = *(data + 10) * 10 + *(data + 11);
+   curr_time =
+       DateTime(year + 2000, month, day, hour, minute, second).unixtime();
    return 1;
 }
 
 double get_rtc_datetime_s(char *out) {
    DateTime now = RTC.now();
+   sprintf(out, "%02d/%02d/%04d %02d.%02d.%02d", now.day(), now.month(),
+           now.year(), now.hour(), now.minute(), now.second());
+   return -2;
+}
+
+double get_internal_datetime_s(char *out) {
+   DateTime now = DateTime(curr_time);
    sprintf(out, "%02d/%02d/%04d %02d.%02d.%02d", now.day(), now.month(),
            now.year(), now.hour(), now.minute(), now.second());
    return -2;
@@ -211,3 +250,5 @@ double get_temperature() {
    t = (wADC - 324.31) / 1.22;
    return abs(t);
 }
+
+void update_internal_clock() { curr_time += 1; }

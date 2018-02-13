@@ -116,16 +116,18 @@ double user_interface(char *cmd_s) {
       if (!rpi_has_power()) {
          retval = set_rtc_datetime_s(&cmd_s[1], out_buf);
       } else {
-         sprintf(out_buf, PS("RPI is running"));
-         retval = -2;
+         retval = set_internal_datetime_s(&cmd_s[1], out_buf);
+         if (retval != -2) {
+            sprintf(out_buf, PS("RPI is running"));
+            retval = -2;
+         }
       }
       break;
    case 't': // get RTC datime
       if (!rpi_has_power()) {
          retval = get_rtc_datetime_s(out_buf);
       } else {
-         sprintf(out_buf, PS("RPI is running"));
-         retval = -2;
+         retval = get_internal_datetime_s(out_buf);
       }
       break;
    case 'v': // get voltage
@@ -208,7 +210,9 @@ void i2c_receive(int count) {
    }
    i2c_buf[i] = '\0';
    retval = user_interface(i2c_buf);
-   if (retval != -2)
+   if (retval == -2)
+      strcpy(i2c_out_buf, out_buf);
+   else
       dtostrf(retval, 6, 3, i2c_out_buf);
 }
 
@@ -237,12 +241,16 @@ void setup() {
    Wire.begin(I2C_ADDRESS); // Start I2C
    RTC.begin();             // Start the RTC clock
    if (analogRead(I2C_SDA) < 900 || analogRead(I2C_SCL) < 900) {
+      // I2C not connected
       set_error(ERR_I2C_FAIL, MSG_I2C_FAIL);
-   } else {
-      // Check RTC is working
-      if (!RTC.isrunning()) {
-         set_error(ERR_RTC_FAIL, MSG_RTC_FAIL);
-      }
+   } else if (rpi_has_power()) {
+      // I2C is busy (rpi is powered)
+      set_error(ERR_I2C_BUSY, MSG_I2C_BUSY);
+   } else if (!RTC.isrunning()) {
+      // RTC is not working
+      set_error(ERR_RTC_FAIL, MSG_RTC_FAIL);
+   } else if (!sync_time()) {
+      set_error(ERR_RTC_INVALID_DATE, MSG_RTC_INVALID_DATE);
    }
 
    // Bind i2c callbacks
@@ -302,6 +310,8 @@ ISR(TIMER1_COMPA_vect) {
 #if DEBUG
    dbg_timer();
 #endif
+   update_internal_clock();
+
    if (error_status) {
       return; // Disable timers if an error happend
    }

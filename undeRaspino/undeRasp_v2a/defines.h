@@ -19,7 +19,9 @@ char prog_buf[100];
 // Messages
 #define MSG_START PS("\n\nUnderRaspino Ready.")
 #define MSG_I2C_FAIL PS("FATAL: i2c bus error")
+#define MSG_I2C_BUSY PS("FATAL: i2c bus is busy (rpi is running)")
 #define MSG_RTC_FAIL PS("FATAL: RTC error")
+#define MSG_RTC_INVALID_DATE PS("FATAL: RTC initial date is invalid")
 #define MSG_VOLTAGE_LOW PS("Battery too low to start RPI")
 #define MSG_VOLTAGE_CRITICAL PS("Battery level critical. Entering safe mode")
 
@@ -35,14 +37,18 @@ char prog_buf[100];
 #define MSG_RPI_NO_BOOT PS("RPI failed to boot")
 
 // ERR CODES
-#define ERR_I2C_FAIL 81
-#define ERR_RTC_FAIL 82
-#define ERR_VOLTAGE_LOW 83
-#define ERR_VOLTAGE_CRITICAL 84
+#define ERR_I2C_FAIL 11
+#define ERR_I2C_BUSY 12
 
-#define RPI_ERR_UNPOWERED 91    // RPI was powered on, but looks unpowered
-#define RPI_ERR_BOOT_FAILED 92  // RPI has power, but looks unable to boot
-#define RPI_ERR_UNRESPONSIVE 93 // RPI booted, but seems unresponsive now
+#define ERR_RTC_FAIL 21
+#define ERR_RTC_INVALID_DATE 22
+
+#define ERR_VOLTAGE_LOW 31
+#define ERR_VOLTAGE_CRITICAL 32
+
+#define RPI_ERR_UNPOWERED 41    // RPI was powered on, but looks unpowered
+#define RPI_ERR_BOOT_FAILED 42  // RPI has power, but looks unable to boot
+#define RPI_ERR_UNRESPONSIVE 43 // RPI booted, but seems unresponsive now
 
 // CONFIG
 #define VCC 3.3

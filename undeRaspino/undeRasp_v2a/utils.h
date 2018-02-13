@@ -22,9 +22,16 @@ double get_temperature();
 double get_eeprom_date();
 double set_eeprom_date(char *buf);
 DateTime get_rtc_datetime();
+bool sync_time();
+uint32_t get_time();
+
 double set_rtc_datetime_s(char *in, char *err);
 double get_rtc_datetime_s(char *err);
+double get_internal_datetime_s(char *err);
+double set_internal_datetime_s(char *in, char *err);
+void update_internal_clock();
 
 bool error_status = false; // flag is set in case of fatal errors
 RTC_DS1307 RTC;
+uint32_t curr_time = 0;
 #endif
