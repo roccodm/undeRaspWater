@@ -1,10 +1,7 @@
 // INCLUDES
-#include "RTClib.h"
 #include "defines.h"
 #include "rpi.h"
 #include "utils.h"
-#include <EEPROM.h>
-#include <Wire.h>
 
 // GLOBAL VARS
 char serial_buf[BUFFSIZE]; // serial buffer
@@ -240,6 +237,12 @@ void setup() {
    digitalWrite(MOSFET_PIN, 0);
    digitalWrite(SERIAL_ARDUINO_PIN, 1);
 
+#if BB_DEBUG
+   pinMode(DBG_PIN, OUTPUT);
+   digitalWrite(DBG_PIN, 0);
+   rpi_set_manual(true);
+#endif
+
    // Inizialize I/O
    Serial.begin(BAUD_RATE); // Start Serial connection
 
@@ -264,7 +267,7 @@ void setup() {
    Wire.onRequest(i2c_send);
 
    // Finally
-   if (!error_status) {
+   if (!has_error()) {
       Serial.println(MSG_START);
       digitalWrite(FAIL_LED_PIN, 0);
       digitalWrite(OK_LED_PIN, 1); // Turn on green led
@@ -275,12 +278,6 @@ void setup() {
    // Print help menu
    print_menu();
 
-#if BB_DEBUG
-   pinMode(DBG_PIN, OUTPUT);
-   digitalWrite(DBG_PIN, 0);
-   rpi_set_manual(true);
-#endif
-
    rpi_setup();
 
    cli(); // stop interrupts
@@ -289,8 +286,19 @@ void setup() {
    TCCR1A = 0; // set entire TCCR1A register to 0
    TCCR1B = 0; // same for TCCR1B
    TCNT1 = 0;  // initialize counter value to 0
+#if DEBUG
+#if F_CPU == 8000000L
+   Serial.println("8mhz CPU");
+#elif F_CPU == 16000000L
+   Serial.println("16mhz CPU");
+#else
+   Serial.println("Unknown CPU");
+#endif
+#endif
    // set compare match register for 1 Hz increments
-   OCR1A = 62499; // = 16000000 / (256 * 1) - 1 (must be <65536)
+   // OCR1A = 62499; // = 16000000 / (256 * 1) - 1 (must be <65536)
+   // OCR1A = 31249; // = 8000000 / (256 * 1) - 1 (must be <65536)
+   OCR1A = F_CPU / (256 * 1) - 1;
    // turn on CTC mode
    TCCR1B |= (1 << WGM12);
    // Set CS12, CS11 and CS10 bits for 256 prescaler
@@ -318,7 +326,14 @@ ISR(TIMER1_COMPA_vect) {
 #endif
    update_internal_clock();
 
-   if (error_status) {
+   if (rpi_get_restart_time_left() < -1) {
+      // should only happen when in manual mode or errors happend
+      // using -1 instead of 0 for safety,
+      // we can be 1 second late in booting, no one will notice
+      rpi_update_waketime();
+   }
+
+   if (has_error()) {
       return; // Disable timers if an error happend
    }
 
@@ -341,7 +356,7 @@ void loop() {
    }
 #endif
 
-   if (error_status) {
+   if (has_error()) {
       return; // Disable loop if an error happened
    }
 

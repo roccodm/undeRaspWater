@@ -1,5 +1,11 @@
 #include "utils.h"
 
+char prog_buf[100]; // initialize program buffer (from defines.h)
+RTC_DS1307 RTC; // initialize RTC
+
+bool error_status = false; // flag is set in case of fatal errors
+uint32_t curr_time = RTC_MIN_DATE;
+
 bool atoi(char *in, int *out, char *err) {
    int i;
    int dpow = 1;
@@ -26,13 +32,15 @@ bool atod(char *in, char *data, char *err) {
    return true;
 }
 
-void set_error(char errcode, const char *msg) {
+void set_error(uint8_t errcode, const char *msg) {
    Serial.println(msg);
    error_status = true;
    EEPROM.write(EEPROM_ERR_LOCATION, errcode);
    digitalWrite(OK_LED_PIN, 0);
    digitalWrite(FAIL_LED_PIN, 1); // Turn on red led
 }
+
+bool has_error() { return error_status; }
 
 uint8_t get_last_error() { return EEPROM.read(EEPROM_ERR_LOCATION); }
 
@@ -76,7 +84,7 @@ bool sync_time() {
    return true;
 }
 
-uint32_t get_time() { return curr_time; }
+uint32_t get_internal_time() { return curr_time; }
 
 /*
  * Function set_rct_datetime_s(string, err)
@@ -140,6 +148,11 @@ double get_internal_datetime_s(char *out) {
 
 void set_mosfet(bool enabled) { digitalWrite(MOSFET_PIN, enabled); }
 
+uint32_t get_eeprom_timestamp() {
+   return DateTime(EEPROM.read(1) + 2000, EEPROM.read(2), EEPROM.read(3),
+                   EEPROM.read(4), EEPROM.read(5))
+       .unixtime();
+}
 /*
  * Function get_eeprom_datetime()
  * read the eeprom datetime and timestep and print it to buf

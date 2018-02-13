@@ -1,4 +1,3 @@
-#include "defines.h"
 #include "rpi.h"
 #include "utils.h"
 #include <EEPROM.h>
@@ -18,8 +17,7 @@ int rpi_cooldown = 0;       // Cooldown used for start/stop operations
 int rpi_checks_result = 0;  // Result from RPI checks on first start
 
 // Restarting
-int rpi_restart_delay = 0; // The delay after which restart the RPI
-int rpi_restart_timer = 0; // The timer to accumulate restart delay
+uint32_t rpi_restart_time = 0; // The time at which to start RPI
 
 void rpi_setup() {
    // Reset all variables (except manual mode)
@@ -29,8 +27,7 @@ void rpi_setup() {
    rpi_halting = false;
    rpi_booted = false;
    rpi_cooldown = 0;
-   rpi_restart_delay = 0;
-   rpi_restart_timer = 0;
+   rpi_restart_time = 0;
 
    // Check initial RPI status
    rpi_started = rpi_has_power();
@@ -43,16 +40,21 @@ void rpi_setup() {
  * Sets the restart timeout after which we want to turn RPI back on.
  */
 void rpi_update_waketime() {
-   rpi_restart_timer = 0;
-   rpi_restart_delay = EEPROM.read(6) * 60;
+   uint32_t ets = get_eeprom_timestamp();
+   uint32_t curr = get_internal_time();
+   uint32_t step = EEPROM.read(6) * 60;
+   if (step == 0) step = 60;
+   if (curr > ets) {
+      rpi_restart_time = curr + (step - ((curr - ets) % step));
+   } else {
+      rpi_restart_time = ets;
+   }
 }
 
 int rpi_get_cooldown() { return rpi_cooldown; }
 
 int rpi_get_restart_time_left() {
-   if (rpi_started)
-      return -1;
-   return rpi_restart_delay - rpi_restart_timer;
+   return rpi_restart_time - get_internal_time();
 }
 
 void rpi_set_serial(bool enabled) {
@@ -91,6 +93,9 @@ void rpi_set_halting(bool enabled) {
    if (enabled)
       rpi_cooldown = 0;
    rpi_halting = enabled;
+#if DEBUG
+   Serial.println("RPI wants to quit!");
+#endif
 }
 
 bool rpi_get_heartbeat() { return rpi_heartbeat; }
@@ -132,15 +137,26 @@ void rpi_handle_ops() {
    // Check if the RPI was started
    if (!rpi_started) {
       if (rpi_first) {
+#if DEBUG
+         Serial.println("First start");
+#endif
          // On first run, immediately start
          rpi_start();
-      } else if (rpi_restart_timer >= rpi_restart_delay) {
+      } else if (get_internal_time() >= rpi_restart_time) {
+#if DEBUG
+         Serial.println("Timed start");
+#endif
          // It's time to start the RPI.
-         rpi_restart_timer = 0;
          rpi_start();
       }
       // All good.
       return;
+   } else {
+      // We should start the RPI but it's still running
+      if (get_internal_time() >= rpi_restart_time) {
+         // Skipping a start, we should log this
+         rpi_update_waketime();
+      }
    }
 
    if (rpi_halting) {
@@ -199,10 +215,13 @@ void rpi_start() {
    digitalWrite(RELAY_SET_PIN, 1);
    delay(100);
    digitalWrite(RELAY_SET_PIN, 0);
-   rpi_started = true;  // If the RPI was started
-   rpi_halting = false; // If RPI requested shutdown
-   rpi_booted = false;  // If RPI sent the first heartbeat
-   rpi_cooldown = 0;    // The cooldown used for start/stop operations
+   rpi_started = true;    // If the RPI was started
+   rpi_heartbeat = false; // The RPI heartbeat
+   rpi_halting = false;   // If RPI requested shutdown
+   rpi_booted = false;    // If RPI sent the first heartbeat
+   rpi_cooldown = 0;      // The cooldown used for start/stop operations
+
+   rpi_update_waketime();
 }
 
 void rpi_stop() {
@@ -217,7 +236,11 @@ void rpi_stop() {
    digitalWrite(RELAY_RESET_PIN, 0);
    rpi_first = false;
    rpi_started = false;
+   rpi_heartbeat = false;
+   rpi_halting = false;
+   rpi_booted = false;
    rpi_cooldown = 0;
+   sync_time();
 }
 
 void rpi_timers_update() {
@@ -235,11 +258,6 @@ void rpi_timers_update() {
       } else if (!rpi_booted && rpi_cooldown < RPI_START_COOLDOWN) {
          // RPI starting
          rpi_cooldown += 1;
-      }
-   } else {
-      // will restart RPI after rpi_restart_delay
-      if (rpi_restart_timer < rpi_restart_delay) {
-         rpi_restart_timer += 1;
       }
    }
 }

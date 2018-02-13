@@ -1,6 +1,11 @@
 #ifndef DEFINES_H
 #define DEFINES_H
 
+#include "Arduino.h"
+#include "RTClib.h"
+#include <EEPROM.h>
+#include <Wire.h>
+
 #define DEBUG 1
 
 #if DEBUG
@@ -14,7 +19,7 @@
 
 // Function to use program memory for strings
 #define PS(str) (strcpy_P(prog_buf, PSTR(str)), prog_buf)
-char prog_buf[100];
+extern char prog_buf[100]; // initialized in utils.h
 
 // Messages
 #define MSG_START PS("\n\nUnderRaspino Ready.")
@@ -69,7 +74,7 @@ char prog_buf[100];
 #define RTC_MIN_DATE 1483228800 // 1/1/2017 0:0:0
 #define BUFFSIZE 21
 #define R_ALPHA 0.152      // for V read purpose, R partitor coeff.
-#define VOLTAGE_LOW 9.2    // minimum operation voltage
+#define VOLTAGE_LOW 9.5    // minimum operation voltage
 #define VOLTAGE_CRITICAL 9 // critical voltage
 
 #define EEPROM_ERR_LOCATION 7
