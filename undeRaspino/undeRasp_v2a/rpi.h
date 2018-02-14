@@ -1,16 +1,18 @@
 #ifndef RPI_H
 #define RPI_H
 
+#include "defines.h"
+
 // TIMERS
 #define RPI_START_COOLDOWN 150
-#define RPI_STOP_COOLDOWN 60
+#define RPI_STOP_COOLDOWN 40
 #define RPI_HEARTBEAT_RESET_TIME 20
 
 // Setup
 void rpi_setup();
 
 // Run mode
-uint8_t rpi_set_run_mode(uint8_t mode);
+uint8_t rpi_set_run_mode_s(char *in, char *err);
 uint8_t rpi_get_run_mode();
 
 // Status
@@ -20,6 +22,8 @@ bool rpi_has_power();
 void rpi_set_halting(bool enabled);
 void rpi_set_heartbeat(bool on);
 bool rpi_get_heartbeat();
+int rpi_set_checks_result(char *in, char *err);
+int rpi_get_checks_result();
 
 // Operations
 void rpi_handle_ops();

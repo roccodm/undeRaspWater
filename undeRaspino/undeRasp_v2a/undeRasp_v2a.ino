@@ -1,17 +1,14 @@
 // INCLUDES
-#include "RTClib.h"
 #include "defines.h"
 #include "rpi.h"
 #include "utils.h"
-#include <EEPROM.h>
-#include <Wire.h>
 
 // GLOBAL VARS
 char serial_buf[BUFFSIZE]; // serial buffer
 short serial_pos = -1;     // serial position (incremented at the beginning)
 
-char i2c_buf[BUFFSIZE]; // i2c buffer
-char i2c_out_buf[7];    // i2c output buffer
+char i2c_buf[BUFFSIZE];     // i2c buffer
+char i2c_out_buf[BUFFSIZE]; // i2c output buffer
 
 char out_buf[BUFFSIZE]; // output buffer
 
@@ -116,16 +113,18 @@ double user_interface(char *cmd_s) {
       if (!rpi_has_power()) {
          retval = set_rtc_datetime_s(&cmd_s[1], out_buf);
       } else {
-         sprintf(out_buf, PS("RPI is running"));
-         retval = -2;
+         retval = set_internal_datetime_s(&cmd_s[1], out_buf);
+         if (retval != -2) {
+            sprintf(out_buf, PS("RPI is running"));
+            retval = -2;
+         }
       }
       break;
    case 't': // get RTC datime
       if (!rpi_has_power()) {
          retval = get_rtc_datetime_s(out_buf);
       } else {
-         sprintf(out_buf, PS("RPI is running"));
-         retval = -2;
+         retval = get_internal_datetime_s(out_buf);
       }
       break;
    case 'v': // get voltage
@@ -136,6 +135,12 @@ double user_interface(char *cmd_s) {
       break;
    case 'x': // get cooldown timer value
       retval = rpi_get_cooldown();
+      break;
+   case 'Y':
+      retval = rpi_set_checks_result(&cmd_s[1], out_buf);
+      break;
+   case 'y':
+      retval = rpi_get_checks_result();
       break;
    case 'z': // get seconds left before starting raspberry
       retval = rpi_get_restart_time_left();
@@ -208,7 +213,9 @@ void i2c_receive(int count) {
    }
    i2c_buf[i] = '\0';
    retval = user_interface(i2c_buf);
-   if (retval != -2)
+   if (retval == -2)
+      strcpy(i2c_out_buf, out_buf);
+   else
       dtostrf(retval, 6, 3, i2c_out_buf);
 }
 
@@ -230,6 +237,12 @@ void setup() {
    digitalWrite(MOSFET_PIN, 0);
    digitalWrite(SERIAL_ARDUINO_PIN, 1);
 
+#if BB_DEBUG
+   pinMode(DBG_PIN, OUTPUT);
+   digitalWrite(DBG_PIN, 0);
+   rpi_set_manual(true);
+#endif
+
    // Inizialize I/O
    Serial.begin(BAUD_RATE); // Start Serial connection
 
@@ -237,12 +250,16 @@ void setup() {
    Wire.begin(I2C_ADDRESS); // Start I2C
    RTC.begin();             // Start the RTC clock
    if (analogRead(I2C_SDA) < 900 || analogRead(I2C_SCL) < 900) {
+      // I2C not connected
       set_error(ERR_I2C_FAIL, MSG_I2C_FAIL);
-   } else {
-      // Check RTC is working
-      if (!RTC.isrunning()) {
-         set_error(ERR_RTC_FAIL, MSG_RTC_FAIL);
-      }
+   } else if (rpi_has_power()) {
+      // I2C is busy (rpi is powered)
+      set_error(ERR_I2C_BUSY, MSG_I2C_BUSY);
+   } else if (!RTC.isrunning()) {
+      // RTC is not working
+      set_error(ERR_RTC_FAIL, MSG_RTC_FAIL);
+   } else if (!sync_time()) {
+      set_error(ERR_RTC_INVALID_DATE, MSG_RTC_INVALID_DATE);
    }
 
    // Bind i2c callbacks
@@ -250,7 +267,7 @@ void setup() {
    Wire.onRequest(i2c_send);
 
    // Finally
-   if (!error_status) {
+   if (!has_error()) {
       Serial.println(MSG_START);
       digitalWrite(FAIL_LED_PIN, 0);
       digitalWrite(OK_LED_PIN, 1); // Turn on green led
@@ -261,12 +278,6 @@ void setup() {
    // Print help menu
    print_menu();
 
-#if BB_DEBUG
-   pinMode(DBG_PIN, OUTPUT);
-   digitalWrite(DBG_PIN, 0);
-   rpi_set_manual(true);
-#endif
-
    rpi_setup();
 
    cli(); // stop interrupts
@@ -275,8 +286,19 @@ void setup() {
    TCCR1A = 0; // set entire TCCR1A register to 0
    TCCR1B = 0; // same for TCCR1B
    TCNT1 = 0;  // initialize counter value to 0
+#if DEBUG
+#if F_CPU == 8000000L
+   Serial.println("8mhz CPU");
+#elif F_CPU == 16000000L
+   Serial.println("16mhz CPU");
+#else
+   Serial.println("Unknown CPU");
+#endif
+#endif
    // set compare match register for 1 Hz increments
-   OCR1A = 62499; // = 16000000 / (256 * 1) - 1 (must be <65536)
+   // OCR1A = 62499; // = 16000000 / (256 * 1) - 1 (must be <65536)
+   // OCR1A = 31249; // = 8000000 / (256 * 1) - 1 (must be <65536)
+   OCR1A = F_CPU / (256 * 1) - 1;
    // turn on CTC mode
    TCCR1B |= (1 << WGM12);
    // Set CS12, CS11 and CS10 bits for 256 prescaler
@@ -302,7 +324,16 @@ ISR(TIMER1_COMPA_vect) {
 #if DEBUG
    dbg_timer();
 #endif
-   if (error_status) {
+   update_internal_clock();
+
+   if (rpi_get_restart_time_left() < -1) {
+      // should only happen when in manual mode or errors happend
+      // using -1 instead of 0 for safety,
+      // we can be 1 second late in booting, no one will notice
+      rpi_update_waketime();
+   }
+
+   if (has_error()) {
       return; // Disable timers if an error happend
    }
 
@@ -314,8 +345,19 @@ ISR(TIMER1_COMPA_vect) {
 
 // Main loop
 void loop() {
-   if (error_status) {
-      return; // Disable loop if an error happend
+#if BB_DEBUG
+#else
+   if (get_voltage() <= VOLTAGE_CRITICAL) {
+      if (get_last_error() != ERR_VOLTAGE_CRITICAL) {
+         rpi_stop();
+         set_mosfet(false);
+         set_error(ERR_VOLTAGE_CRITICAL, MSG_VOLTAGE_CRITICAL);
+      }
+   }
+#endif
+
+   if (has_error()) {
+      return; // Disable loop if an error happened
    }
 
    if (rpi_is_manual()) {

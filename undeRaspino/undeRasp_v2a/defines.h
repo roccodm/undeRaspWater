@@ -1,6 +1,11 @@
 #ifndef DEFINES_H
 #define DEFINES_H
 
+#include "Arduino.h"
+#include "RTClib.h"
+#include <EEPROM.h>
+#include <Wire.h>
+
 #define DEBUG 1
 
 #if DEBUG
@@ -14,13 +19,16 @@
 
 // Function to use program memory for strings
 #define PS(str) (strcpy_P(prog_buf, PSTR(str)), prog_buf)
-char prog_buf[100];
+extern char prog_buf[100]; // initialized in utils.h
 
 // Messages
 #define MSG_START PS("\n\nUnderRaspino Ready.")
 #define MSG_I2C_FAIL PS("FATAL: i2c bus error")
+#define MSG_I2C_BUSY PS("FATAL: i2c bus is busy (rpi is running)")
 #define MSG_RTC_FAIL PS("FATAL: RTC error")
-#define MSG_LOW_BATTERY PS("Low battery to start RB")
+#define MSG_RTC_INVALID_DATE PS("FATAL: RTC initial date is invalid")
+#define MSG_VOLTAGE_LOW PS("Battery too low to start RPI")
+#define MSG_VOLTAGE_CRITICAL PS("Battery level critical. Entering safe mode")
 
 #define MSG_TOO_SHORT PS("too short")
 #define MSG_INVALID_INT PS("invalid int")
@@ -34,13 +42,18 @@ char prog_buf[100];
 #define MSG_RPI_NO_BOOT PS("RPI failed to boot")
 
 // ERR CODES
-#define ERR_I2C_FAIL 81
-#define ERR_RTC_FAIL 82
-#define ERR_LOWBATTERY 83
+#define ERR_I2C_FAIL 11
+#define ERR_I2C_BUSY 12
 
-#define RPI_ERR_UNPOWERED 91    // RPI was powered on, but looks unpowered
-#define RPI_ERR_BOOT_FAILED 92  // RPI has power, but looks unable to boot
-#define RPI_ERR_UNRESPONSIVE 93 // RPI booted, but seems unresponsive now
+#define ERR_RTC_FAIL 21
+#define ERR_RTC_INVALID_DATE 22
+
+#define ERR_VOLTAGE_LOW 31
+#define ERR_VOLTAGE_CRITICAL 32
+
+#define RPI_ERR_UNPOWERED 41    // RPI was powered on, but looks unpowered
+#define RPI_ERR_BOOT_FAILED 42  // RPI has power, but looks unable to boot
+#define RPI_ERR_UNRESPONSIVE 43 // RPI booted, but seems unresponsive now
 
 // CONFIG
 #define VCC 3.3
@@ -60,8 +73,9 @@ char prog_buf[100];
 #define I2C_SCL A5
 #define RTC_MIN_DATE 1483228800 // 1/1/2017 0:0:0
 #define BUFFSIZE 21
-#define R_ALPHA 0.152         // for V read purpose, R partitor coeff.
-#define MIN_BATTERY_VOLTAGE 9 // minimum voltage to start raspberry in safe
+#define R_ALPHA 0.152      // for V read purpose, R partitor coeff.
+#define VOLTAGE_LOW 9.5    // minimum operation voltage
+#define VOLTAGE_CRITICAL 9 // critical voltage
 
 #define EEPROM_ERR_LOCATION 7
 #define EEPROM_MODE_LOCATION 8
