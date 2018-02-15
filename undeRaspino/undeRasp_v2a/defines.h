@@ -6,6 +6,8 @@
 #include <EEPROM.h>
 #include <Wire.h>
 
+typedef uint32_t time_t;
+
 #define DEBUG 1
 
 #if DEBUG

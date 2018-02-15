@@ -33,7 +33,7 @@ void rpi_stop();
 
 // Start timer
 void rpi_update_waketime();
-int rpi_get_restart_time_left();
+time_t rpi_get_restart_time_left();
 
 // Manual mode
 void rpi_set_manual(bool on);

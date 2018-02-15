@@ -17,7 +17,7 @@ int rpi_cooldown = 0;       // Cooldown used for start/stop operations
 int rpi_checks_result = 0;  // Result from RPI checks on first start
 
 // Restarting
-uint32_t rpi_restart_time = 0; // The time at which to start RPI
+time_t rpi_restart_time = 0; // The time at which to start RPI
 
 void rpi_setup() {
    // Reset all variables (except manual mode)
@@ -40,10 +40,11 @@ void rpi_setup() {
  * Sets the restart timeout after which we want to turn RPI back on.
  */
 void rpi_update_waketime() {
-   uint32_t ets = get_eeprom_timestamp();
-   uint32_t curr = get_internal_time();
-   uint32_t step = EEPROM.read(6) * 60;
-   if (step == 0) step = 60;
+   time_t ets = get_eeprom_timestamp();
+   time_t curr = get_internal_time();
+   time_t step = EEPROM.read(6) * 60;
+   if (step <= 0)
+      step = 60;
    if (curr > ets) {
       rpi_restart_time = curr + (step - ((curr - ets) % step));
    } else {
@@ -53,7 +54,7 @@ void rpi_update_waketime() {
 
 int rpi_get_cooldown() { return rpi_cooldown; }
 
-int rpi_get_restart_time_left() {
+time_t rpi_get_restart_time_left() {
    return rpi_restart_time - get_internal_time();
 }
 

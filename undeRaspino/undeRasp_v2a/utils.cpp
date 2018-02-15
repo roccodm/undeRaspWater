@@ -4,7 +4,7 @@ char prog_buf[100]; // initialize program buffer (from defines.h)
 RTC_DS1307 RTC;     // initialize RTC
 
 bool error_status = false; // flag is set in case of fatal errors
-uint32_t curr_time = RTC_MIN_DATE;
+time_t curr_time = RTC_MIN_DATE;
 unsigned short int led_mode = 0;
 unsigned int led_timer = 0;
 
@@ -86,7 +86,7 @@ bool sync_time() {
    return true;
 }
 
-uint32_t get_internal_time() { return curr_time; }
+time_t get_internal_time() { return curr_time; }
 
 /*
  * Function set_rct_datetime_s(string, err)
@@ -150,7 +150,7 @@ double get_internal_datetime_s(char *out) {
 
 void set_mosfet(bool enabled) { digitalWrite(MOSFET_PIN, enabled); }
 
-uint32_t get_eeprom_timestamp() {
+time_t get_eeprom_timestamp() {
    return DateTime(EEPROM.read(1) + 2000, EEPROM.read(2), EEPROM.read(3),
                    EEPROM.read(4), EEPROM.read(5))
        .unixtime();
