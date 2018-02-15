@@ -11,6 +11,7 @@
 
 
 int main(int argc, char** argv) {
+   float val;
    if (argc != 2) {
       printf("Missing parameter. Aborting");
       exit(1);
@@ -37,7 +38,12 @@ int main(int argc, char** argv) {
          break;
       }
    }
-   printf("%s\t(%d,%d)\n",buf,r1,r2);
+   if (i>6) {
+      printf("%s\n",buf);
+   } else {
+      val=atof(buf);
+      printf("%f\n",val);
+   }
    usleep(10000);
    close(file);
    return (EXIT_SUCCESS);

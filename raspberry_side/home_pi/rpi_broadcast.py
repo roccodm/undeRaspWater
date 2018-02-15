@@ -21,8 +21,6 @@ s.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
 str=""
 json_string=""
 while True:
-   with open ("/tmp/rpi_broadcast.msg","r") as file:
-      json_string = file.read()
    p = popen([ARDUI2C,"v"], shell=False, stdin=None, stdout=PIPE, stderr=None, close_fds=True)
    p.wait()
    try:

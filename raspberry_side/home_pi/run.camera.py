@@ -6,7 +6,6 @@
 
 ARDUI2C = "/home/pi/ardui2c"
 PATH = "/var/www/html/data/pictures/"
-TESTFILE = "/tmp/test.png"
 TIMEOUT = 10
 
 from subprocess import Popen,PIPE
@@ -29,8 +28,10 @@ def error():
    sys.exit(1)
 
 
-filename=TESTFILE
+filename=PATH+datetime.now().strftime("%Y%m%d%H%M")+"capture.png"
+
 ardIO("L")
+time.sleep(1)
 raspistill=Popen(["raspistill","-o",filename],stdin=None,stdout=None,stderr=None,shell=False)
 
 timer=0
@@ -40,13 +41,11 @@ while (raspistill.poll() is None):
       error()
    timer += 1
    time.sleep(1)
-
 ardIO("l")
 
 if (os.path.isfile(filename) and os.stat(filename).st_size>0):
    print("ok")
 else:
    error()
-
 
 
