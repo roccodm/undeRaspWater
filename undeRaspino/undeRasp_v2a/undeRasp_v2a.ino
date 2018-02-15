@@ -24,11 +24,9 @@ double user_interface(char *cmd_s) {
       break;
    case 'a': // get ampere
       retval = get_ampere();
-      set_led_status(1);
       break;
    case 'c': // get temperature
       retval = get_temperature();
-      set_led_status(2);
       break;
    case 'D': // set eeprom date
       retval = set_eeprom_datetime(&cmd_s[1], out_buf);
@@ -131,11 +129,9 @@ double user_interface(char *cmd_s) {
       break;
    case 'v': // get voltage
       retval = get_voltage();
-      set_led_status(3);
       break;
    case 'w': // get watts
       retval = get_watts();
-      set_led_status(0);
       break;
    case 'x': // get cooldown timer value
       retval = rpi_get_cooldown();
@@ -309,6 +305,20 @@ void setup() {
    // enable timer compare interrupt
    TIMSK1 |= (1 << OCIE1A);
 
+   // TIMER 2 for interrupt frequency 1000 Hz:
+   TCCR2A = 0; // set entire TCCR2A register to 0
+   TCCR2B = 0; // same for TCCR2B
+   TCNT2 = 0;  // initialize counter value to 0
+   // set compare match register for 1000 Hz increments
+   OCR2A = 249; // = 8000000 / (32 * 1000) - 1 (must be <256)
+   //OCR2A = (unsigned short int)(F_CPU / (32 * 1000) - 1);
+   // turn on CTC mode
+   TCCR2B |= (1 << WGM21);
+   // Set CS22, CS21 and CS20 bits for 32 prescaler
+   TCCR2B |= (0 << CS22) | (1 << CS21) | (1 << CS20);
+   // enable timer compare interrupt
+   TIMSK2 |= (1 << OCIE2A);
+
    sei(); // allow interrupts
 }
 
@@ -369,3 +379,5 @@ void loop() {
 
    rpi_handle_ops();
 }
+
+ISR(TIMER2_COMPA_vect) { update_led_timer(); }

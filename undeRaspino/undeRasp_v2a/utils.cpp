@@ -1,10 +1,12 @@
 #include "utils.h"
 
 char prog_buf[100]; // initialize program buffer (from defines.h)
-RTC_DS1307 RTC; // initialize RTC
+RTC_DS1307 RTC;     // initialize RTC
 
 bool error_status = false; // flag is set in case of fatal errors
 uint32_t curr_time = RTC_MIN_DATE;
+unsigned short int led_mode = 0;
+unsigned int led_timer = 0;
 
 bool atoi(char *in, int *out, char *err) {
    int i;
@@ -245,7 +247,7 @@ double get_voltage() {
 }
 
 double get_ampere() {
-   return ((get_pin_median(AMPERE_PIN,50) * VCC / 1024) - 2.5) / 0.185;
+   return ((get_pin_median(AMPERE_PIN, 50) * VCC / 1024) - 2.5) / 0.185;
 }
 
 double get_watts() { return get_voltage() * get_ampere(); }
@@ -266,23 +268,36 @@ double get_temperature() {
 
 void update_internal_clock() { curr_time += 1; }
 
-void set_led_status(unsigned short int mode) {
-   switch (mode){
-      case 0: // led off
-         digitalWrite(OK_LED_PIN,0);
-         digitalWrite(FAIL_LED_PIN,0);
-         break;
-      case 1: // ok
-         digitalWrite(OK_LED_PIN,1);
-         digitalWrite(FAIL_LED_PIN,0);
-         break;
-      case 2: // fail
-         digitalWrite(OK_LED_PIN,0);
-         digitalWrite(FAIL_LED_PIN,1);
-         break;
-      default:
-         break;
+void set_led_status(unsigned short int mode) { led_mode = mode; }
+
+void update_led_timer() {
+   led_timer += 1;
+   if (led_timer > 999)
+      led_timer = 0;
+
+   switch (led_mode) {
+   case 0: // led off
+      digitalWrite(OK_LED_PIN, 0);
+      digitalWrite(FAIL_LED_PIN, 0);
+      break;
+   case 1: // ok
+      digitalWrite(OK_LED_PIN, 1);
+      digitalWrite(FAIL_LED_PIN, 0);
+      break;
+   case 2: // fail
+      digitalWrite(OK_LED_PIN, 0);
+      digitalWrite(FAIL_LED_PIN, 1);
+      break;
+   case 3:
+      if (led_timer % 2 == 0) {
+         digitalWrite(OK_LED_PIN, 1);
+         digitalWrite(FAIL_LED_PIN, 0);
+      } else {
+         digitalWrite(OK_LED_PIN, 0);
+         digitalWrite(FAIL_LED_PIN, 1);
+      }
+      break;
+   default:
+      break;
    }
-
-
 }
