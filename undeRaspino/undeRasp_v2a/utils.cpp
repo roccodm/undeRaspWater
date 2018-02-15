@@ -36,8 +36,7 @@ void set_error(uint8_t errcode, const char *msg) {
    Serial.println(msg);
    error_status = true;
    EEPROM.write(EEPROM_ERR_LOCATION, errcode);
-   digitalWrite(OK_LED_PIN, 0);
-   digitalWrite(FAIL_LED_PIN, 1); // Turn on red led
+   set_led_status(2);
 }
 
 bool has_error() { return error_status; }
@@ -47,6 +46,7 @@ uint8_t get_last_error() { return EEPROM.read(EEPROM_ERR_LOCATION); }
 void reset_error() {
    error_status = false;
    EEPROM.write(EEPROM_ERR_LOCATION, 0);
+   set_led_status(0);
 }
 
 void print_menu() {
@@ -245,7 +245,7 @@ double get_voltage() {
 }
 
 double get_ampere() {
-   return ((get_pin_median(AMPERE_PIN) * VCC / 1024) - 2.5) / 0.185;
+   return ((get_pin_median(AMPERE_PIN,50) * VCC / 1024) - 2.5) / 0.185;
 }
 
 double get_watts() { return get_voltage() * get_ampere(); }
@@ -265,3 +265,24 @@ double get_temperature() {
 }
 
 void update_internal_clock() { curr_time += 1; }
+
+void set_led_status(unsigned short int mode) {
+   switch (mode){
+      case 0: // led off
+         digitalWrite(OK_LED_PIN,0);
+         digitalWrite(FAIL_LED_PIN,0);
+         break;
+      case 1: // ok
+         digitalWrite(OK_LED_PIN,1);
+         digitalWrite(FAIL_LED_PIN,0);
+         break;
+      case 2: // fail
+         digitalWrite(OK_LED_PIN,0);
+         digitalWrite(FAIL_LED_PIN,1);
+         break;
+      default:
+         break;
+   }
+
+
+}

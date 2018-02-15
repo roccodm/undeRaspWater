@@ -24,9 +24,11 @@ double user_interface(char *cmd_s) {
       break;
    case 'a': // get ampere
       retval = get_ampere();
+      set_led_status(1);
       break;
    case 'c': // get temperature
       retval = get_temperature();
+      set_led_status(2);
       break;
    case 'D': // set eeprom date
       retval = set_eeprom_datetime(&cmd_s[1], out_buf);
@@ -129,9 +131,11 @@ double user_interface(char *cmd_s) {
       break;
    case 'v': // get voltage
       retval = get_voltage();
+      set_led_status(3);
       break;
    case 'w': // get watts
       retval = get_watts();
+      set_led_status(0);
       break;
    case 'x': // get cooldown timer value
       retval = rpi_get_cooldown();
@@ -269,10 +273,9 @@ void setup() {
    // Finally
    if (!has_error()) {
       Serial.println(MSG_START);
-      digitalWrite(FAIL_LED_PIN, 0);
-      digitalWrite(OK_LED_PIN, 1); // Turn on green led
+      set_led_status(1);
       delay(2000);
-      digitalWrite(OK_LED_PIN, 0); // Turn off led
+      set_led_status(0);
    }
 
    // Print help menu

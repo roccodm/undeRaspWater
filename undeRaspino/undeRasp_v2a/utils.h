@@ -33,5 +33,8 @@ double get_internal_datetime_s(char *err);
 double set_internal_datetime_s(char *in, char *err);
 void update_internal_clock();
 
+void set_led_status(unsigned short int mode);
+
+
 extern RTC_DS1307 RTC;
 #endif
