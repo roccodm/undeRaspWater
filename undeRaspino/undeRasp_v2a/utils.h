@@ -20,12 +20,12 @@ double get_voltage();
 double get_ampere();
 double get_watts();
 double get_temperature();
-uint32_t get_eeprom_timestamp();
+time_t get_eeprom_timestamp();
 double get_eeprom_datetime(char *out);
 double set_eeprom_datetime(char *in, char *out);
 DateTime get_rtc_datetime();
 bool sync_time();
-uint32_t get_internal_time();
+time_t get_internal_time();
 
 double set_rtc_datetime_s(char *in, char *err);
 double get_rtc_datetime_s(char *err);
@@ -34,6 +34,7 @@ double set_internal_datetime_s(char *in, char *err);
 void update_internal_clock();
 
 void set_led_status(unsigned short int mode);
+void update_led_timer();
 
 
 extern RTC_DS1307 RTC;

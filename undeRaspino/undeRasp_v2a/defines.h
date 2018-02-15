@@ -6,6 +6,8 @@
 #include <EEPROM.h>
 #include <Wire.h>
 
+typedef uint32_t time_t;
+
 #define DEBUG 1
 
 #if DEBUG
@@ -20,6 +22,23 @@
 // Function to use program memory for strings
 #define PS(str) (strcpy_P(prog_buf, PSTR(str)), prog_buf)
 extern char prog_buf[100]; // initialized in utils.h
+
+// LED States
+#define LED_OFF 0
+#define LED_OK 1
+#define LED_ERROR 2
+#define LED_WARNING 3
+
+// EEPROM locations
+#define EEPROM_YEAR 1
+#define EEPROM_MONTH 2
+#define EEPROM_DAY 3
+#define EEPROM_HOUR 4
+#define EEPROM_MINUTE 5
+#define EEPROM_STEP 6
+#define EEPROM_ERROR 7
+#define EEPROM_MODE 8
+#define EEPROM_APP_ERROR 9
 
 // Messages
 #define MSG_START PS("\n\nUnderRaspino Ready.")
@@ -76,8 +95,5 @@ extern char prog_buf[100]; // initialized in utils.h
 #define R_ALPHA 0.152      // for V read purpose, R partitor coeff.
 #define VOLTAGE_LOW 9.5    // minimum operation voltage
 #define VOLTAGE_CRITICAL 9 // critical voltage
-
-#define EEPROM_ERR_LOCATION 7
-#define EEPROM_MODE_LOCATION 8
 
 #endif

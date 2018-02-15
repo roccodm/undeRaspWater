@@ -20,8 +20,7 @@ int rpi_get_cooldown();
 bool rpi_get_status();
 bool rpi_has_power();
 void rpi_set_halting(bool enabled);
-void rpi_set_heartbeat(bool on);
-bool rpi_get_heartbeat();
+void rpi_set_booted();
 int rpi_set_checks_result(char *in, char *err);
 int rpi_get_checks_result();
 
@@ -33,7 +32,7 @@ void rpi_stop();
 
 // Start timer
 void rpi_update_waketime();
-int rpi_get_restart_time_left();
+int32_t rpi_get_restart_time_left();
 
 // Manual mode
 void rpi_set_manual(bool on);

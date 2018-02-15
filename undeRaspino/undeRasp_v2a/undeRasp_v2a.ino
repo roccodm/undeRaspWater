@@ -24,11 +24,9 @@ double user_interface(char *cmd_s) {
       break;
    case 'a': // get ampere
       retval = get_ampere();
-      set_led_status(1);
       break;
    case 'c': // get temperature
       retval = get_temperature();
-      set_led_status(2);
       break;
    case 'D': // set eeprom date
       retval = set_eeprom_datetime(&cmd_s[1], out_buf);
@@ -45,11 +43,8 @@ double user_interface(char *cmd_s) {
       retval = get_last_error();
       break;
    case 'H': // set heartbeat
-      rpi_set_heartbeat(true);
+      rpi_set_booted();
       retval = 1;
-      break;
-   case 'h': // get RPI heartbeat
-      retval = rpi_get_heartbeat();
       break;
    case 'L': // turn on mosfet
       set_mosfet(true);
@@ -131,14 +126,12 @@ double user_interface(char *cmd_s) {
       break;
    case 'v': // get voltage
       retval = get_voltage();
-      set_led_status(3);
       break;
    case 'w': // get watts
       retval = get_watts();
-      set_led_status(0);
       break;
    case 'x': // get cooldown timer value
-      retval = rpi_get_cooldown();
+      retval = -1; // rpi_get_cooldown();
       break;
    case 'Y':
       retval = rpi_set_checks_result(&cmd_s[1], out_buf);
@@ -273,9 +266,10 @@ void setup() {
    // Finally
    if (!has_error()) {
       Serial.println(MSG_START);
-      set_led_status(1);
+      digitalWrite(OK_LED_PIN, 1);
+      digitalWrite(FAIL_LED_PIN, 0);
       delay(2000);
-      set_led_status(0);
+      set_led_status(LED_OFF);
    }
 
    // Print help menu
@@ -309,6 +303,20 @@ void setup() {
    // enable timer compare interrupt
    TIMSK1 |= (1 << OCIE1A);
 
+   // TIMER 2 for interrupt frequency 1000 Hz:
+   TCCR2A = 0; // set entire TCCR2A register to 0
+   TCCR2B = 0; // same for TCCR2B
+   TCNT2 = 0;  // initialize counter value to 0
+   // set compare match register for 1000 Hz increments
+   OCR2A = 249; // = 8000000 / (32 * 1000) - 1 (must be <256)
+   //OCR2A = (unsigned short int)(F_CPU / (32 * 1000) - 1);
+   // turn on CTC mode
+   TCCR2B |= (1 << WGM21);
+   // Set CS22, CS21 and CS20 bits for 32 prescaler
+   TCCR2B |= (0 << CS22) | (1 << CS21) | (1 << CS20);
+   // enable timer compare interrupt
+   TIMSK2 |= (1 << OCIE2A);
+
    sei(); // allow interrupts
 }
 
@@ -327,14 +335,14 @@ ISR(TIMER1_COMPA_vect) {
 #if DEBUG
    dbg_timer();
 #endif
-   update_internal_clock();
-
    if (rpi_get_restart_time_left() < -1) {
       // should only happen when in manual mode or errors happend
       // using -1 instead of 0 for safety,
       // we can be 1 second late in booting, no one will notice
       rpi_update_waketime();
    }
+
+   update_internal_clock();
 
    if (has_error()) {
       return; // Disable timers if an error happend
@@ -369,3 +377,5 @@ void loop() {
 
    rpi_handle_ops();
 }
+
+ISR(TIMER2_COMPA_vect) { update_led_timer(); }
