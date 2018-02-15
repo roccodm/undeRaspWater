@@ -10,24 +10,31 @@ bool rpi_manual = false; // set true to prevent RPI shutdown
 
 // RPI status (could use bitfield)
 bool rpi_started = false;   // If RPI was started
-bool rpi_heartbeat = false; // If RPI is alive
 bool rpi_halting = false;   // If RPI requested shutdown
 bool rpi_booted = false;    // If RPI sent the first heartbeat
-int rpi_cooldown = 0;       // Cooldown used for start/stop operations
 int rpi_checks_result = 0;  // Result from RPI checks on first start
+
+uint32_t rpi_boot_cd = 0;
+uint32_t rpi_hb_cd = 0;
+uint32_t rpi_halt_cd = 0;
 
 // Restarting
 time_t rpi_restart_time = 0; // The time at which to start RPI
+
+void rpi_reset_cds() {
+   rpi_hb_cd = 0;
+   rpi_halt_cd = 0;
+   rpi_boot_cd = 0;
+}
 
 void rpi_setup() {
    // Reset all variables (except manual mode)
    rpi_first = true;
    rpi_started = false;
-   rpi_heartbeat = false;
    rpi_halting = false;
    rpi_booted = false;
-   rpi_cooldown = 0;
-   rpi_restart_time = 0;
+   rpi_boot_cd = 0;
+   rpi_reset_cds();
 
    // Check initial RPI status
    rpi_started = rpi_has_power();
@@ -52,9 +59,7 @@ void rpi_update_waketime() {
    }
 }
 
-int rpi_get_cooldown() { return rpi_cooldown; }
-
-time_t rpi_get_restart_time_left() {
+int32_t rpi_get_restart_time_left() {
    return rpi_restart_time - get_internal_time();
 }
 
@@ -84,22 +89,18 @@ uint8_t rpi_get_run_mode() {
    return ret;
 }
 
-void rpi_set_heartbeat(bool on) {
-   rpi_heartbeat = on;
-   rpi_cooldown = 0;
+void rpi_set_booted() {
+   rpi_reset_cds();
    rpi_booted = true;
 }
 
 void rpi_set_halting(bool enabled) {
-   if (enabled)
-      rpi_cooldown = 0;
+   rpi_reset_cds();
    rpi_halting = enabled;
 #if DEBUG
    Serial.println("RPI wants to quit!");
 #endif
 }
-
-bool rpi_get_heartbeat() { return rpi_heartbeat; }
 
 void rpi_set_manual(bool on) { rpi_manual = on; }
 bool rpi_is_manual() { return rpi_manual; }
@@ -112,10 +113,8 @@ bool rpi_get_status() {
       status += 1;
    if (rpi_booted)
       status += 2;
-   if (rpi_heartbeat)
-      status += 4;
    if (rpi_halting)
-      status += 8;
+      status += 4;
    return status;
 }
 
@@ -169,7 +168,7 @@ void rpi_handle_ops() {
 
    if (rpi_halting) {
       // RPI asked to shutdown
-      if (rpi_cooldown >= RPI_STOP_COOLDOWN) {
+      if (rpi_halt_cd >= RPI_STOP_COOLDOWN) {
          // It's time to shut it down as requested. All good.
          rpi_stop();
       }
@@ -177,26 +176,14 @@ void rpi_handle_ops() {
       return;
    }
 
-   if (rpi_get_heartbeat()) {
-      // RPI was started, is not halting, and looks alive. All good.
-      return;
-   }
-
-   if (!rpi_has_power() && rpi_cooldown > 0) {
+   if (!rpi_has_power() && rpi_boot_cd > 0) {
       // RPI was started, did not request a shutdown, but looks dead,
       // and is unpowered. Setting error.
       set_error(RPI_ERR_UNPOWERED, MSG_RPI_NO_POWER);
       return;
    }
 
-   if (rpi_booted) {
-      // RPI was started, did not request shutdown, is powered, and
-      // booted properly but looks dead. Setting error.
-      set_error(RPI_ERR_UNRESPONSIVE, MSG_RPI_NO_RESPONSE);
-      return;
-   }
-
-   if (rpi_cooldown >= RPI_START_COOLDOWN) {
+   if (!rpi_booted && !rpi_halting && rpi_boot_cd >= RPI_START_COOLDOWN) {
       // RPI was started, did not request shutdown, is powered, looks
       // dead, and the boot timer has expired. Setting error.
       set_error(RPI_ERR_BOOT_FAILED, MSG_RPI_NO_BOOT);
@@ -224,10 +211,9 @@ void rpi_start() {
    delay(100);
    digitalWrite(RELAY_SET_PIN, 0);
    rpi_started = true;    // If the RPI was started
-   rpi_heartbeat = false; // The RPI heartbeat
    rpi_halting = false;   // If RPI requested shutdown
    rpi_booted = false;    // If RPI sent the first heartbeat
-   rpi_cooldown = 0;      // The cooldown used for start/stop operations
+   rpi_reset_cds();
 
    rpi_update_waketime();
 }
@@ -244,28 +230,20 @@ void rpi_stop() {
    digitalWrite(RELAY_RESET_PIN, 0);
    rpi_first = false;
    rpi_started = false;
-   rpi_heartbeat = false;
    rpi_halting = false;
    rpi_booted = false;
-   rpi_cooldown = 0;
+   rpi_reset_cds();
    sync_time();
 }
 
 void rpi_timers_update() {
    if (rpi_started) {
-      if (!rpi_halting && rpi_booted) {
-         // Heartbeat reset
-         rpi_cooldown += 1;
-         if (rpi_cooldown >= RPI_HEARTBEAT_RESET_TIME) {
-            rpi_cooldown = 0;
-            rpi_heartbeat = false;
-         }
-      } else if (rpi_halting && rpi_cooldown < RPI_STOP_COOLDOWN) {
+      if (rpi_halting && rpi_halt_cd < RPI_STOP_COOLDOWN) {
          // RPI halting
-         rpi_cooldown += 1;
-      } else if (!rpi_booted && rpi_cooldown < RPI_START_COOLDOWN) {
+         rpi_halt_cd += 1;
+      } else if (!rpi_booted && rpi_boot_cd < RPI_START_COOLDOWN) {
          // RPI starting
-         rpi_cooldown += 1;
+         rpi_boot_cd += 1;
       }
    }
 }

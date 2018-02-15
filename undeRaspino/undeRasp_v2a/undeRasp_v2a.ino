@@ -43,11 +43,8 @@ double user_interface(char *cmd_s) {
       retval = get_last_error();
       break;
    case 'H': // set heartbeat
-      rpi_set_heartbeat(true);
+      rpi_set_booted();
       retval = 1;
-      break;
-   case 'h': // get RPI heartbeat
-      retval = rpi_get_heartbeat();
       break;
    case 'L': // turn on mosfet
       set_mosfet(true);
@@ -134,7 +131,7 @@ double user_interface(char *cmd_s) {
       retval = get_watts();
       break;
    case 'x': // get cooldown timer value
-      retval = rpi_get_cooldown();
+      retval = -1; // rpi_get_cooldown();
       break;
    case 'Y':
       retval = rpi_set_checks_result(&cmd_s[1], out_buf);
@@ -269,9 +266,10 @@ void setup() {
    // Finally
    if (!has_error()) {
       Serial.println(MSG_START);
-      set_led_status(LED_OK);
+      digitalWrite(OK_LED_PIN, 1);
+      digitalWrite(FAIL_LED_PIN, 0);
       delay(2000);
-      set_led_status(LED_ERROR);
+      set_led_status(LED_OFF);
    }
 
    // Print help menu
@@ -337,14 +335,14 @@ ISR(TIMER1_COMPA_vect) {
 #if DEBUG
    dbg_timer();
 #endif
-   update_internal_clock();
-
    if (rpi_get_restart_time_left() < -1) {
       // should only happen when in manual mode or errors happend
       // using -1 instead of 0 for safety,
       // we can be 1 second late in booting, no one will notice
       rpi_update_waketime();
    }
+
+   update_internal_clock();
 
    if (has_error()) {
       return; // Disable timers if an error happend
