@@ -37,18 +37,18 @@ bool atod(char *in, char *data, char *err) {
 void set_error(uint8_t errcode, const char *msg) {
    Serial.println(msg);
    error_status = true;
-   EEPROM.write(EEPROM_ERR_LOCATION, errcode);
-   set_led_status(2);
+   EEPROM.write(EEPROM_ERROR, errcode);
+   set_led_status(LED_ERROR);
 }
 
 bool has_error() { return error_status; }
 
-uint8_t get_last_error() { return EEPROM.read(EEPROM_ERR_LOCATION); }
+uint8_t get_last_error() { return EEPROM.read(EEPROM_ERROR); }
 
 void reset_error() {
    error_status = false;
-   EEPROM.write(EEPROM_ERR_LOCATION, 0);
-   set_led_status(0);
+   EEPROM.write(EEPROM_ERROR, 0);
+   set_led_status(LED_OFF);
 }
 
 void print_menu() {
@@ -151,8 +151,9 @@ double get_internal_datetime_s(char *out) {
 void set_mosfet(bool enabled) { digitalWrite(MOSFET_PIN, enabled); }
 
 time_t get_eeprom_timestamp() {
-   return DateTime(EEPROM.read(1) + 2000, EEPROM.read(2), EEPROM.read(3),
-                   EEPROM.read(4), EEPROM.read(5))
+   return DateTime(EEPROM.read(EEPROM_YEAR) + 2000, EEPROM.read(EEPROM_MONTH),
+                   EEPROM.read(EEPROM_DAY), EEPROM.read(EEPROM_HOUR),
+                   EEPROM.read(EEPROM_MINUTE))
        .unixtime();
 }
 /*
@@ -161,8 +162,10 @@ time_t get_eeprom_timestamp() {
  * out format: YYMMDDHHMMTTT where TTT is the timestep (max 250)
  */
 double get_eeprom_datetime(char *out) {
-   sprintf(out, "%02d%02d%02d%02d%02d%03d", EEPROM.read(1), EEPROM.read(2),
-           EEPROM.read(3), EEPROM.read(4), EEPROM.read(5), EEPROM.read(6));
+   sprintf(out, "%02d%02d%02d%02d%02d%03d", EEPROM.read(EEPROM_YEAR),
+           EEPROM.read(EEPROM_MONTH), EEPROM.read(EEPROM_DAY),
+           EEPROM.read(EEPROM_HOUR), EEPROM.read(EEPROM_MINUTE),
+           EEPROM.read(EEPROM_STEP));
    // returns -2 that means the the return values are stored in buf
    return -2;
 }
@@ -194,12 +197,12 @@ double set_eeprom_datetime(char *in, char *out) {
       sprintf(out, MSG_INVALID_INT);
       return -2; // Problem in conversion
    }
-   EEPROM.write(1, year);
-   EEPROM.write(2, month);
-   EEPROM.write(3, day);
-   EEPROM.write(4, hour);
-   EEPROM.write(5, minute);
-   EEPROM.write(6, timestep);
+   EEPROM.write(EEPROM_YEAR, year);
+   EEPROM.write(EEPROM_MONTH, month);
+   EEPROM.write(EEPROM_DAY, day);
+   EEPROM.write(EEPROM_HOUR, hour);
+   EEPROM.write(EEPROM_MINUTE, minute);
+   EEPROM.write(EEPROM_STEP, timestep);
    sprintf(out, MSG_OK);
    return -2;
 }
@@ -276,19 +279,19 @@ void update_led_timer() {
       led_timer = 0;
 
    switch (led_mode) {
-   case 0: // led off
+	   case LED_OFF:
       digitalWrite(OK_LED_PIN, 0);
       digitalWrite(FAIL_LED_PIN, 0);
       break;
-   case 1: // ok
+   case LED_OK:
       digitalWrite(OK_LED_PIN, 1);
       digitalWrite(FAIL_LED_PIN, 0);
       break;
-   case 2: // fail
+   case LED_ERROR:
       digitalWrite(OK_LED_PIN, 0);
       digitalWrite(FAIL_LED_PIN, 1);
       break;
-   case 3:
+   case LED_WARNING:
       if (led_timer % 2 == 0) {
          digitalWrite(OK_LED_PIN, 1);
          digitalWrite(FAIL_LED_PIN, 0);

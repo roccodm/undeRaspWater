@@ -269,9 +269,9 @@ void setup() {
    // Finally
    if (!has_error()) {
       Serial.println(MSG_START);
-      set_led_status(1);
+      set_led_status(LED_OK);
       delay(2000);
-      set_led_status(0);
+      set_led_status(LED_ERROR);
    }
 
    // Print help menu

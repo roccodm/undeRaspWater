@@ -42,7 +42,7 @@ void rpi_setup() {
 void rpi_update_waketime() {
    time_t ets = get_eeprom_timestamp();
    time_t curr = get_internal_time();
-   time_t step = EEPROM.read(6) * 60;
+   time_t step = EEPROM.read(EEPROM_STEP) * 60;
    if (step <= 0)
       step = 60;
    if (curr > ets) {
@@ -73,12 +73,12 @@ uint8_t rpi_set_run_mode_s(char *in, char *out) {
    int val;
    if (!atoi(in, &val, out) || val > 127)
       return -1;
-   EEPROM.write(EEPROM_MODE_LOCATION, val);
+   EEPROM.write(EEPROM_MODE, val);
    return val;
 };
 
 uint8_t rpi_get_run_mode() {
-   uint8_t ret = EEPROM.read(EEPROM_MODE_LOCATION);
+   uint8_t ret = EEPROM.read(EEPROM_MODE);
    if (rpi_first)
       ret |= 0x80;
    return ret;
@@ -120,14 +120,21 @@ bool rpi_get_status() {
 }
 
 int rpi_set_checks_result(char *in, char *err) {
+   int out = 0;
    rpi_checks_result = 0;
-   if (strlen(in) < 1)
-      return 0;
-   if (!atoi(in, &rpi_checks_result, err)) {
+   if (strlen(in) > 0 && !atoi(in, &rpi_checks_result, err)) {
       rpi_checks_result = 1;
-      return -2;
+      out = -2; // return atoi error
+   } else {
+      out = rpi_checks_result; // return check result
    }
-   return rpi_checks_result;
+   if (!has_error()) { // set led
+      if (rpi_checks_result == 0)
+         set_led_status(LED_OFF);
+      else
+         set_led_status(LED_WARNING);
+   }
+   return out;
 }
 
 int rpi_get_checks_result() { return rpi_checks_result; }
