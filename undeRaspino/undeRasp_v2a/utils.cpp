@@ -279,17 +279,22 @@ void update_led_timer() {
       led_timer = 0;
 
    switch (led_mode) {
-	   case LED_OFF:
+   case LED_OFF:
       digitalWrite(OK_LED_PIN, 0);
       digitalWrite(FAIL_LED_PIN, 0);
+      break;
+   case LED_CHECKING:
+      digitalWrite(FAIL_LED_PIN, 0);
+      if (led_timer < 500) {
+         digitalWrite(OK_LED_PIN, 1);
+
+      } else {
+         digitalWrite(OK_LED_PIN, 0);
+      }
       break;
    case LED_OK:
       digitalWrite(OK_LED_PIN, 1);
       digitalWrite(FAIL_LED_PIN, 0);
-      break;
-   case LED_ERROR:
-      digitalWrite(OK_LED_PIN, 0);
-      digitalWrite(FAIL_LED_PIN, 1);
       break;
    case LED_WARNING:
       if (led_timer % 2 == 0) {
@@ -299,6 +304,10 @@ void update_led_timer() {
          digitalWrite(OK_LED_PIN, 0);
          digitalWrite(FAIL_LED_PIN, 1);
       }
+      break;
+   case LED_ERROR:
+      digitalWrite(OK_LED_PIN, 0);
+      digitalWrite(FAIL_LED_PIN, 1);
       break;
    default:
       break;

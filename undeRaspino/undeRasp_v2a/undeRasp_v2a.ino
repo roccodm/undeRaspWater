@@ -130,9 +130,6 @@ double user_interface(char *cmd_s) {
    case 'w': // get watts
       retval = get_watts();
       break;
-   case 'x': // get cooldown timer value
-      retval = -1; // rpi_get_cooldown();
-      break;
    case 'Y':
       retval = rpi_set_checks_result(&cmd_s[1], out_buf);
       break;
@@ -266,10 +263,7 @@ void setup() {
    // Finally
    if (!has_error()) {
       Serial.println(MSG_START);
-      digitalWrite(OK_LED_PIN, 1);
-      digitalWrite(FAIL_LED_PIN, 0);
-      delay(2000);
-      set_led_status(LED_OFF);
+      set_led_status(LED_CHECKING);
    }
 
    // Print help menu
