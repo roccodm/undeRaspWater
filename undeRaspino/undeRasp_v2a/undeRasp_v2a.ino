@@ -303,7 +303,7 @@ void setup() {
    TCNT2 = 0;  // initialize counter value to 0
    // set compare match register for 1000 Hz increments
    OCR2A = 249; // = 8000000 / (32 * 1000) - 1 (must be <256)
-   //OCR2A = (unsigned short int)(F_CPU / (32 * 1000) - 1);
+   // OCR2A = (unsigned short int)(F_CPU / (32 * 1000) - 1);
    // turn on CTC mode
    TCCR2B |= (1 << WGM21);
    // Set CS22, CS21 and CS20 bits for 32 prescaler
@@ -312,6 +312,8 @@ void setup() {
    TIMSK2 |= (1 << OCIE2A);
 
    sei(); // allow interrupts
+
+   delay(1000); // Allow populating voltage/ampere samples before starting loop
 }
 
 #if DEBUG
