@@ -372,4 +372,7 @@ void loop() {
    rpi_handle_ops();
 }
 
-ISR(TIMER2_COMPA_vect) { update_led_timer(); }
+ISR(TIMER2_COMPA_vect) {
+   update_samples();
+   update_led_timer();
+}

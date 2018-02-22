@@ -1,5 +1,7 @@
 #include "utils.h"
 
+#define SAMPLES_SIZE 21
+
 char prog_buf[100]; // initialize program buffer (from defines.h)
 RTC_DS1307 RTC;     // initialize RTC
 
@@ -7,6 +9,9 @@ bool error_status = false; // flag is set in case of fatal errors
 time_t curr_time = RTC_MIN_DATE;
 unsigned short int led_mode = 0;
 unsigned int led_timer = 0;
+int voltage_samples[SAMPLES_SIZE];
+int ampere_samples[SAMPLES_SIZE];
+int samples_pos = 0;
 
 bool atoi(char *in, int *out, char *err) {
    int i;
@@ -210,47 +215,42 @@ double set_eeprom_datetime(char *in, char *out) {
 /*
  * Function get_pin_median(pinNumber, readDelay)
  *
- * Sometimes the adc could read dirty values. To avoid wrong values in critical
- * operations
- * more values are read and stored in an ordered array of odd number of
- * elements.
+ * Sometimes the adc could read dirty values.
+ * To avoid wrong values in critical operations, samples are taken at fixed
+ * steps and stored in an array of odd number of elements.
+ *
  * Sorting the array, the bad value will go in a boundary and, returning the
- * median value
- * (the central element in the array), it's highly probable to get a good value.
+ * median value (the central element in the array), it's highly probable to
+ * get a good value.
  *
  * The InsertionSort algorithm has been used to sort the values, that is pretty
- * fast (such
- * as the quicksort algorithm!!!) for small array (under 10 element, optimus is
- * 7).
+ * fast for small array (under 10 element, optimus is 7).
  *
  * Input:
- *   PinNumber: analog pin to be read
- *   Delay: optional delay between read
+ *   samples: the samples array
  * Output:
- *   The median value of the array of seven reads (integer)
+ *   The median value of the samples array (integer)
  */
-
-int get_pin_median(int pinNumber, int readDelay) {
-   int value, v[7];
-   for (int n = 0; n < 7; n++) {
+int get_pin_median(int *samples) {
+   int value, v[SAMPLES_SIZE];
+   for (int n = 0; n < SAMPLES_SIZE; n++) {
       int i = 0;
-      value = analogRead(pinNumber);
+      value = samples[n];
       while (i < n and value <= v[i])
          i++;
       for (int j = n - 1; j >= i; j--)
          v[j + 1] = v[j];
       v[i] = value;
-      delay(readDelay);
    }
-   return v[3];
+   return v[(SAMPLES_SIZE - 1) / 2];
 }
 
 double get_voltage() {
-   return (get_pin_median(VOLTAGE_PIN) * VCC / 1024) / R_ALPHA;
+   return (get_pin_median(voltage_samples) * VCC / 1024) / R_ALPHA;
 }
 
 double get_ampere() {
-   return ((get_pin_median(AMPERE_PIN, 50) * VCC / 1024) - 2.5) / 0.185;
+   return ((get_pin_median(ampere_samples) * VCC / 1024) - 2.5) / 0.185;
 }
 
 double get_watts() { return get_voltage() * get_ampere(); }
@@ -267,6 +267,15 @@ double get_temperature() {
    wADC = ADCW;
    t = (wADC - 324.31) / 1.22;
    return abs(t);
+}
+
+void update_samples() {
+   voltage_samples[samples_pos] = analogRead(VOLTAGE_PIN);
+   ampere_samples[samples_pos] = analogRead(AMPERE_PIN);
+   samples_pos += 1;
+   if (samples_pos >= SAMPLES_SIZE) {
+      samples_pos = 0;
+   }
 }
 
 void update_internal_clock() { curr_time += 1; }
