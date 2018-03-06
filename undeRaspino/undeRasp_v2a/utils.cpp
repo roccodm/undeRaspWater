@@ -1,10 +1,17 @@
 #include "utils.h"
 
+#define SAMPLES_SIZE 21
+
 char prog_buf[100]; // initialize program buffer (from defines.h)
-RTC_DS1307 RTC; // initialize RTC
+RTC_DS1307 RTC;     // initialize RTC
 
 bool error_status = false; // flag is set in case of fatal errors
-uint32_t curr_time = RTC_MIN_DATE;
+time_t curr_time = RTC_MIN_DATE;
+unsigned short int led_mode = 0;
+unsigned int led_timer = 0;
+int voltage_samples[SAMPLES_SIZE];
+int ampere_samples[SAMPLES_SIZE];
+int samples_pos = 0;
 
 bool atoi(char *in, int *out, char *err) {
    int i;
@@ -35,18 +42,18 @@ bool atod(char *in, char *data, char *err) {
 void set_error(uint8_t errcode, const char *msg) {
    Serial.println(msg);
    error_status = true;
-   EEPROM.write(EEPROM_ERR_LOCATION, errcode);
-   set_led_status(2);
+   EEPROM.write(EEPROM_ERROR, errcode);
+   set_led_status(LED_ERROR);
 }
 
 bool has_error() { return error_status; }
 
-uint8_t get_last_error() { return EEPROM.read(EEPROM_ERR_LOCATION); }
+uint8_t get_last_error() { return EEPROM.read(EEPROM_ERROR); }
 
 void reset_error() {
    error_status = false;
-   EEPROM.write(EEPROM_ERR_LOCATION, 0);
-   set_led_status(0);
+   EEPROM.write(EEPROM_ERROR, 0);
+   set_led_status(LED_OFF);
 }
 
 void print_menu() {
@@ -84,7 +91,7 @@ bool sync_time() {
    return true;
 }
 
-uint32_t get_internal_time() { return curr_time; }
+time_t get_internal_time() { return curr_time; }
 
 /*
  * Function set_rct_datetime_s(string, err)
@@ -148,9 +155,10 @@ double get_internal_datetime_s(char *out) {
 
 void set_mosfet(bool enabled) { digitalWrite(MOSFET_PIN, enabled); }
 
-uint32_t get_eeprom_timestamp() {
-   return DateTime(EEPROM.read(1) + 2000, EEPROM.read(2), EEPROM.read(3),
-                   EEPROM.read(4), EEPROM.read(5))
+time_t get_eeprom_timestamp() {
+   return DateTime(EEPROM.read(EEPROM_YEAR) + 2000, EEPROM.read(EEPROM_MONTH),
+                   EEPROM.read(EEPROM_DAY), EEPROM.read(EEPROM_HOUR),
+                   EEPROM.read(EEPROM_MINUTE))
        .unixtime();
 }
 /*
@@ -159,8 +167,10 @@ uint32_t get_eeprom_timestamp() {
  * out format: YYMMDDHHMMTTT where TTT is the timestep (max 250)
  */
 double get_eeprom_datetime(char *out) {
-   sprintf(out, "%02d%02d%02d%02d%02d%03d", EEPROM.read(1), EEPROM.read(2),
-           EEPROM.read(3), EEPROM.read(4), EEPROM.read(5), EEPROM.read(6));
+   sprintf(out, "%02d%02d%02d%02d%02d%03d", EEPROM.read(EEPROM_YEAR),
+           EEPROM.read(EEPROM_MONTH), EEPROM.read(EEPROM_DAY),
+           EEPROM.read(EEPROM_HOUR), EEPROM.read(EEPROM_MINUTE),
+           EEPROM.read(EEPROM_STEP));
    // returns -2 that means the the return values are stored in buf
    return -2;
 }
@@ -192,12 +202,12 @@ double set_eeprom_datetime(char *in, char *out) {
       sprintf(out, MSG_INVALID_INT);
       return -2; // Problem in conversion
    }
-   EEPROM.write(1, year);
-   EEPROM.write(2, month);
-   EEPROM.write(3, day);
-   EEPROM.write(4, hour);
-   EEPROM.write(5, minute);
-   EEPROM.write(6, timestep);
+   EEPROM.write(EEPROM_YEAR, year);
+   EEPROM.write(EEPROM_MONTH, month);
+   EEPROM.write(EEPROM_DAY, day);
+   EEPROM.write(EEPROM_HOUR, hour);
+   EEPROM.write(EEPROM_MINUTE, minute);
+   EEPROM.write(EEPROM_STEP, timestep);
    sprintf(out, MSG_OK);
    return -2;
 }
@@ -205,47 +215,42 @@ double set_eeprom_datetime(char *in, char *out) {
 /*
  * Function get_pin_median(pinNumber, readDelay)
  *
- * Sometimes the adc could read dirty values. To avoid wrong values in critical
- * operations
- * more values are read and stored in an ordered array of odd number of
- * elements.
+ * Sometimes the adc could read dirty values.
+ * To avoid wrong values in critical operations, samples are taken at fixed
+ * steps and stored in an array of odd number of elements.
+ *
  * Sorting the array, the bad value will go in a boundary and, returning the
- * median value
- * (the central element in the array), it's highly probable to get a good value.
+ * median value (the central element in the array), it's highly probable to
+ * get a good value.
  *
  * The InsertionSort algorithm has been used to sort the values, that is pretty
- * fast (such
- * as the quicksort algorithm!!!) for small array (under 10 element, optimus is
- * 7).
+ * fast for small array (under 10 element, optimus is 7).
  *
  * Input:
- *   PinNumber: analog pin to be read
- *   Delay: optional delay between read
+ *   samples: the samples array
  * Output:
- *   The median value of the array of seven reads (integer)
+ *   The median value of the samples array (integer)
  */
-
-int get_pin_median(int pinNumber, int readDelay) {
-   int value, v[7];
-   for (int n = 0; n < 7; n++) {
+int get_pin_median(int *samples) {
+   int value, v[SAMPLES_SIZE];
+   for (int n = 0; n < SAMPLES_SIZE; n++) {
       int i = 0;
-      value = analogRead(pinNumber);
+      value = samples[n];
       while (i < n and value <= v[i])
          i++;
       for (int j = n - 1; j >= i; j--)
          v[j + 1] = v[j];
       v[i] = value;
-      delay(readDelay);
    }
-   return v[3];
+   return v[(SAMPLES_SIZE - 1) / 2];
 }
 
 double get_voltage() {
-   return (get_pin_median(VOLTAGE_PIN) * VCC / 1024) / R_ALPHA;
+   return (get_pin_median(voltage_samples) * VCC / 1024) / R_ALPHA;
 }
 
 double get_ampere() {
-   return ((get_pin_median(AMPERE_PIN,50) * VCC / 1024) - 2.5) / 0.185;
+   return ((get_pin_median(ampere_samples) * VCC / 1024) - 2.5) / 0.185;
 }
 
 double get_watts() { return get_voltage() * get_ampere(); }
@@ -264,25 +269,56 @@ double get_temperature() {
    return abs(t);
 }
 
+void update_samples() {
+   voltage_samples[samples_pos] = analogRead(VOLTAGE_PIN);
+   ampere_samples[samples_pos] = analogRead(AMPERE_PIN);
+   samples_pos += 1;
+   if (samples_pos >= SAMPLES_SIZE) {
+      samples_pos = 0;
+   }
+}
+
 void update_internal_clock() { curr_time += 1; }
 
-void set_led_status(unsigned short int mode) {
-   switch (mode){
-      case 0: // led off
-         digitalWrite(OK_LED_PIN,0);
-         digitalWrite(FAIL_LED_PIN,0);
-         break;
-      case 1: // ok
-         digitalWrite(OK_LED_PIN,1);
-         digitalWrite(FAIL_LED_PIN,0);
-         break;
-      case 2: // fail
-         digitalWrite(OK_LED_PIN,0);
-         digitalWrite(FAIL_LED_PIN,1);
-         break;
-      default:
-         break;
+void set_led_status(unsigned short int mode) { led_mode = mode; }
+
+void update_led_timer() {
+   led_timer += 1;
+   if (led_timer > 999)
+      led_timer = 0;
+
+   switch (led_mode) {
+   case LED_OFF:
+      digitalWrite(OK_LED_PIN, 0);
+      digitalWrite(FAIL_LED_PIN, 0);
+      break;
+   case LED_CHECKING:
+      digitalWrite(FAIL_LED_PIN, 0);
+      if (led_timer < 500) {
+         digitalWrite(OK_LED_PIN, 1);
+
+      } else {
+         digitalWrite(OK_LED_PIN, 0);
+      }
+      break;
+   case LED_OK:
+      digitalWrite(OK_LED_PIN, 1);
+      digitalWrite(FAIL_LED_PIN, 0);
+      break;
+   case LED_WARNING:
+      if (led_timer % 2 == 0) {
+         digitalWrite(OK_LED_PIN, 1);
+         digitalWrite(FAIL_LED_PIN, 0);
+      } else {
+         digitalWrite(OK_LED_PIN, 0);
+         digitalWrite(FAIL_LED_PIN, 1);
+      }
+      break;
+   case LED_ERROR:
+      digitalWrite(OK_LED_PIN, 0);
+      digitalWrite(FAIL_LED_PIN, 1);
+      break;
+   default:
+      break;
    }
-
-
 }
