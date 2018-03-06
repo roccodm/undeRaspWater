@@ -9,6 +9,7 @@ LOCK_FILE="/tmp/rpi.lock"
 LOCK_TIMEOUT=100
 MIN_VOLTAGE=9.5
 MIN_DISKSPACE=104857600
+debug_mode=False
 test_mode=False
 WAIT_FOR_REMOTE=30
 
@@ -61,8 +62,9 @@ def common_tests():
    return True
 
 def quit(val):
-   ardIO("Q")
-   p = Popen(["sudo","halt"], stdin=None, stdout=None, stderr=None)
+   if not debug_mode:
+      ardIO("Q")
+      p = Popen(["sudo","halt"], stdin=None, stdout=None, stderr=None)
    sys.exit(val)
 
 
@@ -103,8 +105,11 @@ operations = {
 # Getting running mode
 #------------------------------
 runstatus = int(ardIO("m"))
-opmode=runstatus&0x7f
+opmode=runstatus&0x3f
+
 if(runstatus&0x80>0):
+   debug_mode=True
+if(runstatus&0x40>0):
    test_mode=True
 
 # Check if operation is in the oplist
