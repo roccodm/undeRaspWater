@@ -25,9 +25,10 @@ extern char prog_buf[100]; // initialized in utils.h
 
 // LED States
 #define LED_OFF 0
-#define LED_OK 1
-#define LED_ERROR 2
+#define LED_CHECKING 1
+#define LED_OK 2
 #define LED_WARNING 3
+#define LED_ERROR 4
 
 // EEPROM locations
 #define EEPROM_YEAR 1

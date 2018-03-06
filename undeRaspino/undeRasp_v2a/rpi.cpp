@@ -128,10 +128,14 @@ int rpi_set_checks_result(char *in, char *err) {
       out = rpi_checks_result; // return check result
    }
    if (!has_error()) { // set led
-      if (rpi_checks_result == 0)
-         set_led_status(LED_OFF);
-      else
+      if (rpi_checks_result == 0) {
+         if (rpi_first)
+            set_led_status(LED_OK);
+         else
+            set_led_status(LED_OFF);
+      } else {
          set_led_status(LED_WARNING);
+      }
    }
    return out;
 }
@@ -225,6 +229,9 @@ void rpi_stop() {
    digitalWrite(DBG_PIN, 0);
 #endif
 #endif
+   if (rpi_first && rpi_checks_result == 0 && !has_error()) {
+      set_led_status(LED_OFF); // All good, turn off led
+   }
    digitalWrite(RELAY_RESET_PIN, 1);
    delay(100);
    digitalWrite(RELAY_RESET_PIN, 0);

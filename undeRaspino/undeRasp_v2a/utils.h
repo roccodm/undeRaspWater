@@ -34,6 +34,7 @@ double set_internal_datetime_s(char *in, char *err);
 void update_internal_clock();
 
 void set_led_status(unsigned short int mode);
+void update_samples();
 void update_led_timer();
 
 

@@ -130,9 +130,6 @@ double user_interface(char *cmd_s) {
    case 'w': // get watts
       retval = get_watts();
       break;
-   case 'x': // get cooldown timer value
-      retval = -1; // rpi_get_cooldown();
-      break;
    case 'Y':
       retval = rpi_set_checks_result(&cmd_s[1], out_buf);
       break;
@@ -266,10 +263,7 @@ void setup() {
    // Finally
    if (!has_error()) {
       Serial.println(MSG_START);
-      digitalWrite(OK_LED_PIN, 1);
-      digitalWrite(FAIL_LED_PIN, 0);
-      delay(2000);
-      set_led_status(LED_OFF);
+      set_led_status(LED_CHECKING);
    }
 
    // Print help menu
@@ -309,7 +303,7 @@ void setup() {
    TCNT2 = 0;  // initialize counter value to 0
    // set compare match register for 1000 Hz increments
    OCR2A = 249; // = 8000000 / (32 * 1000) - 1 (must be <256)
-   //OCR2A = (unsigned short int)(F_CPU / (32 * 1000) - 1);
+   // OCR2A = (unsigned short int)(F_CPU / (32 * 1000) - 1);
    // turn on CTC mode
    TCCR2B |= (1 << WGM21);
    // Set CS22, CS21 and CS20 bits for 32 prescaler
@@ -318,6 +312,8 @@ void setup() {
    TIMSK2 |= (1 << OCIE2A);
 
    sei(); // allow interrupts
+
+   delay(1000); // Allow populating voltage/ampere samples before starting loop
 }
 
 #if DEBUG
@@ -378,4 +374,7 @@ void loop() {
    rpi_handle_ops();
 }
 
-ISR(TIMER2_COMPA_vect) { update_led_timer(); }
+ISR(TIMER2_COMPA_vect) {
+   update_samples();
+   update_led_timer();
+}
