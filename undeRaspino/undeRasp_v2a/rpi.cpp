@@ -84,8 +84,10 @@ uint8_t rpi_set_run_mode_s(char *in, char *out) {
 
 uint8_t rpi_get_run_mode() {
    uint8_t ret = EEPROM.read(EEPROM_MODE);
-   if (rpi_first)
+   if (rpi_manual)
       ret |= 0x80;
+   if (rpi_first)
+      ret |= 0x40;
    return ret;
 }
 
