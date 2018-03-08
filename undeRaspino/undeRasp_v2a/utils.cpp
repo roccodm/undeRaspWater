@@ -40,7 +40,9 @@ bool atod(char *in, char *data, char *err) {
 }
 
 void set_error(uint8_t errcode, const char *msg) {
+#if DEBUG
    Serial.println(msg);
+#endif
    error_status = true;
    EEPROM.write(EEPROM_ERROR, errcode);
    set_led_status(LED_ERROR);
