@@ -231,6 +231,11 @@ void setup() {
    digitalWrite(MOSFET_PIN, 0);
    digitalWrite(SERIAL_ARDUINO_PIN, 1);
 
+   // Ensure RPI shutdown
+   digitalWrite(RELAY_RESET_PIN, 1);
+   delay(20);
+   digitalWrite(RELAY_RESET_PIN, 0);
+
 #if BB_DEBUG
    pinMode(DBG_PIN, OUTPUT);
    digitalWrite(DBG_PIN, 0);

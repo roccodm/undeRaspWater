@@ -12,6 +12,7 @@ unsigned int led_timer = 0;
 int voltage_samples[SAMPLES_SIZE];
 int ampere_samples[SAMPLES_SIZE];
 int samples_pos = 0;
+bool is_reading_temp = false;
 
 bool atoi(char *in, int *out, char *err) {
    int i;
@@ -40,7 +41,9 @@ bool atod(char *in, char *data, char *err) {
 }
 
 void set_error(uint8_t errcode, const char *msg) {
+#if DEBUG
    Serial.println(msg);
+#endif
    error_status = true;
    EEPROM.write(EEPROM_ERROR, errcode);
    set_led_status(LED_ERROR);
@@ -256,6 +259,7 @@ double get_ampere() {
 double get_watts() { return get_voltage() * get_ampere(); }
 
 double get_temperature() {
+   is_reading_temp = true;
    unsigned int wADC;
    double t;
    ADMUX = (_BV(REFS1) | _BV(REFS0) | _BV(MUX3));
@@ -266,10 +270,13 @@ double get_temperature() {
       ;
    wADC = ADCW;
    t = (wADC - 324.31) / 1.22;
+   is_reading_temp = false;
    return abs(t);
 }
 
 void update_samples() {
+   if (is_reading_temp)
+      return; // we cannot perform analogReads when reading temperature
    voltage_samples[samples_pos] = analogRead(VOLTAGE_PIN);
    ampere_samples[samples_pos] = analogRead(AMPERE_PIN);
    samples_pos += 1;
