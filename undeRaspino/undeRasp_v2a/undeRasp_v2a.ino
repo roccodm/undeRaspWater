@@ -275,6 +275,7 @@ void setup() {
    print_menu();
 
    rpi_setup();
+   adc_setup();
 
    cli(); // stop interrupts
 
