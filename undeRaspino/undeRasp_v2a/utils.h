@@ -37,6 +37,7 @@ void set_led_status(unsigned short int mode);
 void update_samples();
 void update_led_timer();
 
+void adc_setup();
 
 extern RTC_DS1307 RTC;
 #endif

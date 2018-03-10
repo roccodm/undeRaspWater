@@ -11,8 +11,8 @@ unsigned short int led_mode = 0;
 unsigned int led_timer = 0;
 int voltage_samples[SAMPLES_SIZE];
 int ampere_samples[SAMPLES_SIZE];
+int temperature_samples[SAMPLES_SIZE];
 int samples_pos = 0;
-bool is_reading_temp = false;
 
 bool atoi(char *in, int *out, char *err) {
    int i;
@@ -258,33 +258,6 @@ double get_ampere() {
 
 double get_watts() { return get_voltage() * get_ampere(); }
 
-double get_temperature() {
-   is_reading_temp = true;
-   unsigned int wADC;
-   double t;
-   ADMUX = (_BV(REFS1) | _BV(REFS0) | _BV(MUX3));
-   ADCSRA |= _BV(ADEN); // enable the ADC
-   delay(50);           // wait for voltages to become stable.
-   ADCSRA |= _BV(ADSC); // Start the ADC
-   while (bit_is_set(ADCSRA, ADSC))
-      ;
-   wADC = ADCW;
-   t = (wADC - 324.31) / 1.22;
-   is_reading_temp = false;
-   return abs(t);
-}
-
-void update_samples() {
-   if (is_reading_temp)
-      return; // we cannot perform analogReads when reading temperature
-   voltage_samples[samples_pos] = analogRead(VOLTAGE_PIN);
-   ampere_samples[samples_pos] = analogRead(AMPERE_PIN);
-   samples_pos += 1;
-   if (samples_pos >= SAMPLES_SIZE) {
-      samples_pos = 0;
-   }
-}
-
 void update_internal_clock() { curr_time += 1; }
 
 void set_led_status(unsigned short int mode) { led_mode = mode; }
@@ -301,7 +274,7 @@ void update_led_timer() {
       break;
    case LED_CHECKING:
       digitalWrite(FAIL_LED_PIN, 0);
-      if (led_timer < 500) {
+      if (led_timer < 50) {
          digitalWrite(OK_LED_PIN, 1);
 
       } else {
@@ -329,3 +302,97 @@ void update_led_timer() {
       break;
    }
 }
+
+#if DIRECT_ADC
+
+#define PINS_SIZE 3
+#define ADC_FOR_PIN(pin)                                                       \
+   ADMUX = B00000000 | (pin == 8 ? _BV(REFS1) | _BV(REFS0) : _BV(REFS0)) |     \
+           ((_BV(MUX0) | _BV(MUX1) | _BV(MUX2) | _BV(MUX3)) & pin) |           \
+           _BV(ADEN);
+
+unsigned int pins[PINS_SIZE] = {0, 1, 8};
+unsigned int pin_pos = 0;
+unsigned int pin_wait = 0;
+bool pin_reading = false;
+
+double get_temperature() {
+   return (get_pin_median(temperature_samples) - 324.31) / 1.22;
+}
+
+void adc_setup() {
+   // Prepare ADMUX
+   ADC_FOR_PIN(pins[pin_pos]); // enable the ADC (12 ADC cycles to complete)
+}
+
+void _set_sample(unsigned int value) {
+   int *samples = voltage_samples;
+   if (pin_pos == 1) {
+      samples = ampere_samples;
+   } else if (pin_pos == 2) {
+      samples = temperature_samples;
+   }
+   samples[samples_pos] = value;
+}
+
+void update_samples() {
+   if (bit_is_set(ADCSRA, ADSC)) // Still reading
+      return;
+
+   unsigned int val = 0;
+   if (pin_reading) { // We finished reading
+      pin_reading = false;
+      val = ADCW;
+      _set_sample(val);
+      // Select the new pin
+      pin_pos += 1;
+      if (pin_pos >= PINS_SIZE) {
+         pin_pos = 0;
+         samples_pos += 1;
+         if (samples_pos >= SAMPLES_SIZE) {
+            samples_pos = 0;
+         }
+      }
+      // Start convertion on new pin
+      ADC_FOR_PIN(pins[pin_pos]); // enable the ADC (12 ADC cycles to complete)
+      pin_wait = 0;
+   } else {                   // We should start a new reading after wait time
+      if (pin_wait >= 50) {   // Start a new conversion
+         ADCSRA |= _BV(ADSC); // Start the ADC
+         pin_reading = true;
+      }
+      pin_wait += 1;
+   }
+}
+#else
+bool is_reading_temp = false;
+
+double get_temperature() {
+   is_reading_temp = true;
+   unsigned int wADC;
+   double t;
+   ADMUX = (_BV(REFS1) | _BV(REFS0) | _BV(MUX3));
+   ADCSRA |= _BV(ADEN); // enable the ADC
+   delay(50);           // wait for voltages to become stable.
+   ADCSRA |= _BV(ADSC); // Start the ADC
+   while (bit_is_set(ADCSRA, ADSC))
+      ;
+   wADC = ADCW;
+   t = (wADC - 324.31) / 1.22;
+   is_reading_temp = false;
+   return abs(t);
+}
+
+void adc_setup() {}
+
+void update_samples() {
+   if (is_reading_temp)
+      return; // we cannot perform analogReads when reading temperature
+   voltage_samples[samples_pos] = analogRead(VOLTAGE_PIN);
+   ampere_samples[samples_pos] = analogRead(AMPERE_PIN);
+   samples_pos += 1;
+   if (samples_pos >= SAMPLES_SIZE) {
+      samples_pos = 0;
+   }
+}
+#endif
