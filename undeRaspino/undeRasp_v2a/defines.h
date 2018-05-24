@@ -19,6 +19,8 @@ typedef uint32_t time_t;
 
 #endif
 
+#define DIRECT_ADC 0
+
 // Function to use program memory for strings
 #define PS(str) (strcpy_P(prog_buf, PSTR(str)), prog_buf)
 extern char prog_buf[100]; // initialized in utils.h

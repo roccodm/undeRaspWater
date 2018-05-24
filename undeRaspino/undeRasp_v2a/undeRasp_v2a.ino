@@ -231,6 +231,11 @@ void setup() {
    digitalWrite(MOSFET_PIN, 0);
    digitalWrite(SERIAL_ARDUINO_PIN, 1);
 
+   // Ensure RPI shutdown
+   digitalWrite(RELAY_RESET_PIN, 1);
+   delay(20);
+   digitalWrite(RELAY_RESET_PIN, 0);
+
 #if BB_DEBUG
    pinMode(DBG_PIN, OUTPUT);
    digitalWrite(DBG_PIN, 0);
@@ -270,6 +275,7 @@ void setup() {
    print_menu();
 
    rpi_setup();
+   adc_setup();
 
    cli(); // stop interrupts
 
@@ -301,6 +307,18 @@ void setup() {
    TCCR2A = 0; // set entire TCCR2A register to 0
    TCCR2B = 0; // same for TCCR2B
    TCNT2 = 0;  // initialize counter value to 0
+
+#if F_CPU == 16000000L
+   // set compare match register for 2000 Hz increments (TIMER 2 does not play
+   // well 64 bit prescaler)
+   OCR2A = 249; // = 16000000 / (32 * 2000) - 1 (must be <256)
+   // turn on CTC mode
+   TCCR2B |= (1 << WGM21);
+   // Set CS22, CS21 and CS20 bits for 32 prescaler
+   TCCR2B |= (0 << CS22) | (1 << CS21) | (1 << CS20);
+   // enable timer compare interrupt
+   TIMSK2 |= (1 << OCIE2A);
+#else
    // set compare match register for 1000 Hz increments
    OCR2A = 249; // = 8000000 / (32 * 1000) - 1 (must be <256)
    // OCR2A = (unsigned short int)(F_CPU / (32 * 1000) - 1);
@@ -310,6 +328,7 @@ void setup() {
    TCCR2B |= (0 << CS22) | (1 << CS21) | (1 << CS20);
    // enable timer compare interrupt
    TIMSK2 |= (1 << OCIE2A);
+#endif
 
    sei(); // allow interrupts
 
@@ -374,7 +393,15 @@ void loop() {
    rpi_handle_ops();
 }
 
+bool even = false;
 ISR(TIMER2_COMPA_vect) {
+#if F_CPU == 16000000L
+   if (!even) {
+      even = true;
+      return;
+   }
+   even = false;
+#endif
    update_samples();
    update_led_timer();
 }
